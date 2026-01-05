@@ -1,0 +1,55 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Vulkan App",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/bin/${fileBasenameNoExtension}.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {
+          "name": "PATH",
+          "value": "${env:PATH};C:/VulkanSDK/1.4.335.0/Bin;${workspaceFolder}/bin"
+        }
+      ],
+      "console": "integratedTerminal",
+      "preLaunchTask": "Build Vulkan/GLFW Project"
+    },
+    {
+      "name": "Run Without Build",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/bin/${fileBasenameNoExtension}.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {
+          "name": "PATH",
+          "value": "${env:PATH};C:/VulkanSDK/1.4.335.0/Bin;${workspaceFolder}/bin"
+        }
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Debug Current File",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/bin/${fileBasenameNoExtension}.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {
+          "name": "PATH",
+          "value": "${env:PATH};C:/VulkanSDK/1.4.335.0/Bin;${workspaceFolder}/bin"
+        }
+      ],
+      "console": "integratedTerminal",
+      "preLaunchTask": "Build Vulkan/GLFW Project"
+    }
+  ]
+}

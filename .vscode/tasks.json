@@ -1,0 +1,95 @@
+{
+  "tasks": [
+    {
+      "label": "Build Vulkan/GLFW Project - Release",
+      "type": "shell",
+      "command": "cl.exe",
+      "args": [
+        "/O2",
+        "/EHsc",
+        "/nologo",
+        "/MD",
+        "/std:c++17",
+        "/DNDEBUG",
+        "/I",
+        "${workspaceFolder}/lib/glfw-3.4/include",
+        "/I",
+        "C:/VulkanSDK/1.4.335.0/Include",
+        "/I",
+        "${workspaceFolder}/lib/glm-1.0.3",
+        "/I",
+        "${workspaceFolder}/lib/stb-master",
+        "/I",
+        "${workspaceFolder}/lib/tiny_obj_loader",
+        "/Fe:",
+        "${workspaceFolder}/bin/${fileBasenameNoExtension}_release.exe",
+        "${file}",
+        "/link",
+        "/SUBSYSTEM:WINDOWS", // <-- THIS REMOVES THE CONSOLE
+        "/ENTRY:mainCRTStartup", // <-- Required entry point for WinMain-like apps
+        "/LIBPATH:C:/VulkanSDK/1.4.335.0/Lib",
+        "/LIBPATH:${workspaceFolder}/lib/glfw-3.4/lib-vc2022",
+        "glfw3.lib",
+        "vulkan-1.lib",
+        "user32.lib",
+        "gdi32.lib",
+        "shell32.lib",
+        "ole32.lib"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$msCompile"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Build Vulkan/GLFW Project",
+      "type": "shell",
+      "command": "cl.exe",
+      "args": [
+        "/Zi",
+        "/EHsc",
+        "/nologo",
+        "/MDd",
+        "/std:c++17",
+        "/I",
+        "${workspaceFolder}/lib/glfw-3.4/include",
+        "/I",
+        "C:/VulkanSDK/1.4.335.0/Include",
+        "/I",
+        "${workspaceFolder}/lib/glm-1.0.3",
+        "/I",
+        "${workspaceFolder}/lib/stb-master",
+        "/I",
+        "${workspaceFolder}/lib/tiny_obj_loader",
+        "/Fe:",
+        "${workspaceFolder}/bin/${fileBasenameNoExtension}.exe",
+        "${file}",
+        "/link",
+        "/LIBPATH:C:/VulkanSDK/1.4.335.0/Lib",
+        "/LIBPATH:${workspaceFolder}/lib/glfw-3.4/lib-vc2022",
+        "glfw3.lib",
+        "vulkan-1.lib",
+        "user32.lib",
+        "gdi32.lib",
+        "shell32.lib",
+        "ole32.lib"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$msCompile"
+      ],
+      "group": {
+        "kind": "build"
+      }
+    }
+  ],
+  "version": "2.0.0"
+}
