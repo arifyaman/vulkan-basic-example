@@ -3,10 +3,12 @@
         {
             "name": "Win64",
             "includePath": [
+                "${workspaceFolder}",
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/lib/glfw-3.4/include",
                 "${workspaceFolder}/lib/glm-1.0.3",
                 "${workspaceFolder}/lib/stb-master",
+                "${workspaceFolder}/lib/tiny_obj_loader",
                 "C:/VulkanSDK/1.4.335.0/Include"
             ],
             "defines": [

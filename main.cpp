@@ -1,9 +1,6 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/hash.hpp>
@@ -11,11 +8,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
 #include <iostream>
 #include <fstream>
+#include <string>
 #include <stdexcept>
 #include <algorithm>
 #include <chrono>
@@ -28,6 +23,11 @@
 #include <optional>
 #include <set>
 #include <unordered_map>
+#include <memory>
+
+#include "Model.h"
+#include "ModelInstance.h"
+#include "SceneManager.h"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -89,62 +89,6 @@ struct SwapChainSupportDetails
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-struct Vertex
-{
-    glm::vec3 pos;
-    glm::vec3 color;
-    glm::vec2 texCoord;
-
-    static VkVertexInputBindingDescription getBindingDescription()
-    {
-        VkVertexInputBindingDescription bindingDescription{};
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(Vertex);
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-        return bindingDescription;
-    }
-
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions()
-    {
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
-
-        attributeDescriptions[0].binding = 0;
-        attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[0].offset = offsetof(Vertex, pos);
-
-        attributeDescriptions[1].binding = 0;
-        attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[1].offset = offsetof(Vertex, color);
-
-        attributeDescriptions[2].binding = 0;
-        attributeDescriptions[2].location = 2;
-        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
-
-        return attributeDescriptions;
-    }
-
-    bool operator==(const Vertex &other) const
-    {
-        return pos == other.pos && color == other.color && texCoord == other.texCoord;
-    }
-};
-
-namespace std
-{
-    template <>
-    struct hash<Vertex>
-    {
-        size_t operator()(Vertex const &vertex) const
-        {
-            return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^ (hash<glm::vec2>()(vertex.texCoord) << 1);
-        }
-    };
-}
-
 struct UniformBufferObject
 {
     alignas(16) glm::mat4 model;
@@ -166,12 +110,16 @@ public:
 private:
     GLFWwindow *window;
 
+    // Scene management
+    std::shared_ptr<SceneManager> sceneManager;
+    std::shared_ptr<Model> vikingRoomModel;
+
     // FPS tracking
     double lastTime = 0.0;
     int frameCount = 0;
     double fps = 0.0;
 
-    // Quaternions for SLERP rotation
+    // Quaternions for SLERP rotation (for interactive model instance)
     glm::quat currentRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // Identity quaternion
     glm::quat targetRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);  // Identity quaternion
 
@@ -226,12 +174,12 @@ private:
     VkImageView textureImageView;
     VkSampler textureSampler;
 
-    std::vector<Vertex> vertices;
-    std::vector<uint32_t> indices;
+    // Single shared vertex/index buffer for the shared model
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
+    uint32_t indexCount = 0;  // Number of indices in the shared model
 
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
@@ -322,6 +270,9 @@ private:
 
     void initVulkan()
     {
+        // Initialize scene manager
+        sceneManager = std::make_shared<SceneManager>();
+
         createInstance();
         setupDebugMessenger();
         createSurface();
@@ -1351,48 +1302,23 @@ private:
 
     void loadModel()
     {
-        tinyobj::attrib_t attrib;
-        std::vector<tinyobj::shape_t> shapes;
-        std::vector<tinyobj::material_t> materials;
-        std::string err;
+        vikingRoomModel = std::make_shared<Model>();
+        vikingRoomModel->loadFromFile(MODEL_PATH);
+        sceneManager->setModel("viking_room", vikingRoomModel);
 
-        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, MODEL_PATH.c_str()))
-        {
-            throw std::runtime_error(err);
-        }
+        // Create the first instance with the viking room model
+        auto mainInstance = std::make_shared<ModelInstance>("viking_room_instance");
+        sceneManager->addInstance(mainInstance);
 
-        std::unordered_map<Vertex, uint32_t> uniqueVertices{};
-
-        for (const auto &shape : shapes)
-        {
-            for (const auto &index : shape.mesh.indices)
-            {
-                Vertex vertex{};
-
-                vertex.pos = {
-                    attrib.vertices[3 * index.vertex_index + 0],
-                    attrib.vertices[3 * index.vertex_index + 1],
-                    attrib.vertices[3 * index.vertex_index + 2]};
-
-                vertex.texCoord = {
-                    attrib.texcoords[2 * index.texcoord_index + 0],
-                    1.0f - attrib.texcoords[2 * index.texcoord_index + 1]};
-
-                vertex.color = {1.0f, 1.0f, 1.0f};
-
-                if (uniqueVertices.count(vertex) == 0)
-                {
-                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-                    vertices.push_back(vertex);
-                }
-
-                indices.push_back(uniqueVertices[vertex]);
-            }
-        }
+        // You can add more instances here to test multiple objects
+        // auto secondInstance = std::make_shared<ModelInstance>("viking_room_instance_2");
+        // secondInstance->setPosition(glm::vec3(3.0f, 0.0f, 0.0f));
+        // sceneManager->addInstance(secondInstance);
     }
 
     void createVertexBuffer()
     {
+        const auto &vertices = vikingRoomModel->getVertices();
         VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
         VkBuffer stagingBuffer;
@@ -1414,6 +1340,8 @@ private:
 
     void createIndexBuffer()
     {
+        const auto &indices = vikingRoomModel->getIndices();
+        indexCount = static_cast<uint32_t>(indices.size());
         VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
         VkBuffer stagingBuffer;
@@ -1675,7 +1603,17 @@ private:
 
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 
-        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+        // Render all instances in the scene
+        for (size_t i = 0; i < sceneManager->getInstanceCount(); ++i)
+        {
+            auto instance = sceneManager->getInstance(i);
+            if (instance)
+            {
+                // In a more advanced system, you would update per-instance uniforms here
+                // and call vkCmdDrawIndexed for each instance
+                vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
+            }
+        }
 
         vkCmdEndRenderPass(commandBuffer);
 
