@@ -96,21 +96,41 @@ namespace std
 class Model
 {
 public:
-    Model() = default;
-    ~Model() = default;
+    Model(VkDevice device, VkPhysicalDevice physicalDevice, VkCommandPool commandPool, VkQueue graphicsQueue);
+    ~Model();
 
     // Load model from OBJ file
     void loadFromFile(const std::string &modelPath);
+
+    // Create Vulkan buffers for the model
+    void createBuffers(VkDevice device, VkPhysicalDevice physicalDevice, VkCommandPool commandPool, VkQueue graphicsQueue);
+
+    // Cleanup Vulkan resources
+    void cleanup(VkDevice device);
 
     // Getters
     const std::vector<Vertex> &getVertices() const { return vertices; }
     const std::vector<uint32_t> &getIndices() const { return indices; }
     uint32_t getVertexCount() const { return static_cast<uint32_t>(vertices.size()); }
     uint32_t getIndexCount() const { return static_cast<uint32_t>(indices.size()); }
+    VkBuffer getVertexBuffer() const { return vertexBuffer; }
+    VkBuffer getIndexBuffer() const { return indexBuffer; }
 
     bool isLoaded() const { return !vertices.empty() && !indices.empty(); }
+    bool hasBuffers() const { return vertexBuffer != VK_NULL_HANDLE && indexBuffer != VK_NULL_HANDLE; }
 
 private:
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
+
+    // Vulkan buffers
+    VkBuffer vertexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
+    VkBuffer indexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory indexBufferMemory = VK_NULL_HANDLE;
+
+    // Helper methods for buffer creation
+    void createBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
+    void copyBuffer(VkDevice device, VkCommandPool commandPool, VkQueue graphicsQueue, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+    uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties);
 };

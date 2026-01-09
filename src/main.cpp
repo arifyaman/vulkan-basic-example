@@ -91,7 +91,6 @@ struct SwapChainSupportDetails
 
 struct UniformBufferObject
 {
-    alignas(16) glm::mat4 model;
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
 };
@@ -112,7 +111,6 @@ private:
 
     // Scene management
     std::shared_ptr<SceneManager> sceneManager;
-    std::shared_ptr<Model> vikingRoomModel;
 
     // FPS tracking
     double lastTime = 0.0;
@@ -174,12 +172,7 @@ private:
     VkImageView textureImageView;
     VkSampler textureSampler;
 
-    // Single shared vertex/index buffer for the shared model
-    VkBuffer vertexBuffer;
-    VkDeviceMemory vertexBufferMemory;
-    VkBuffer indexBuffer;
-    VkDeviceMemory indexBufferMemory;
-    uint32_t indexCount = 0;  // Number of indices in the shared model
+
 
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
@@ -291,8 +284,6 @@ private:
         createTextureImageView();
         createTextureSampler();
         loadModel();
-        createVertexBuffer();
-        createIndexBuffer();
         createUniformBuffers();
         createDescriptorPool();
         createDescriptorSets();
@@ -360,6 +351,9 @@ private:
     {
         cleanupSwapChain();
 
+        // Cleanup all models
+        sceneManager->cleanupModels(device);
+
         vkDestroyPipeline(device, graphicsPipeline, nullptr);
         vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
         vkDestroyRenderPass(device, renderPass, nullptr);
@@ -379,12 +373,6 @@ private:
         vkFreeMemory(device, textureImageMemory, nullptr);
 
         vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-
-        vkDestroyBuffer(device, indexBuffer, nullptr);
-        vkFreeMemory(device, indexBufferMemory, nullptr);
-
-        vkDestroyBuffer(device, vertexBuffer, nullptr);
-        vkFreeMemory(device, vertexBufferMemory, nullptr);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
@@ -845,10 +833,17 @@ private:
         dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
         dynamicState.pDynamicStates = dynamicStates.data();
 
+        VkPushConstantRange pushConstantRange{};
+        pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        pushConstantRange.offset = 0;
+        pushConstantRange.size = sizeof(glm::mat4);
+
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1;
         pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+        pipelineLayoutInfo.pushConstantRangeCount = 1;
+        pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
         if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
         {
@@ -1302,64 +1297,30 @@ private:
 
     void loadModel()
     {
-        vikingRoomModel = std::make_shared<Model>();
+        // Load viking room model
+        auto vikingRoomModel = std::make_shared<Model>(device, physicalDevice, commandPool, graphicsQueue);
         vikingRoomModel->loadFromFile(MODEL_PATH);
+        vikingRoomModel->createBuffers(device, physicalDevice, commandPool, graphicsQueue);
         sceneManager->setModel("viking_room", vikingRoomModel);
 
-        // Create the first instance with the viking room model
-        auto mainInstance = std::make_shared<ModelInstance>("viking_room_instance");
-        sceneManager->addInstance(mainInstance);
+        // Create multiple instances of the same model with different scales and positions
+        auto instance1 = std::make_shared<ModelInstance>("viking_room", "instance_1");
+        instance1->setPosition(glm::vec3(-1.5f, 0.0f, 0.0f));
+        instance1->setScale(glm::vec3(0.5f, 0.5f, 0.5f)); // Smaller scale, left
+        sceneManager->addInstance(instance1);
 
-        // You can add more instances here to test multiple objects
-        // auto secondInstance = std::make_shared<ModelInstance>("viking_room_instance_2");
-        // secondInstance->setPosition(glm::vec3(3.0f, 0.0f, 0.0f));
-        // sceneManager->addInstance(secondInstance);
+        auto instance2 = std::make_shared<ModelInstance>("viking_room", "instance_2");
+        instance2->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+        instance2->setScale(glm::vec3(1.0f, 1.0f, 1.0f)); // Normal scale, center
+        sceneManager->addInstance(instance2);
+
+        auto instance3 = std::make_shared<ModelInstance>("viking_room", "instance_3");
+        instance3->setPosition(glm::vec3(1.5f, 0.0f, 0.0f));
+        instance3->setScale(glm::vec3(1.5f, 1.5f, 1.5f)); // Larger scale, right
+        sceneManager->addInstance(instance3);
     }
 
-    void createVertexBuffer()
-    {
-        const auto &vertices = vikingRoomModel->getVertices();
-        VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-        void *data;
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, vertices.data(), (size_t)bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
-
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
-
-        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
-
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
-    }
-
-    void createIndexBuffer()
-    {
-        const auto &indices = vikingRoomModel->getIndices();
-        indexCount = static_cast<uint32_t>(indices.size());
-        VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
-
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-        void *data;
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, indices.data(), (size_t)bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
-
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-
-        copyBuffer(stagingBuffer, indexBuffer, bufferSize);
-
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
-    }
 
     void createUniformBuffers()
     {
@@ -1595,12 +1556,6 @@ private:
         scissor.extent = swapChainExtent;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        VkBuffer vertexBuffers[] = {vertexBuffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-
-        vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 
         // Render all instances in the scene
@@ -1609,9 +1564,32 @@ private:
             auto instance = sceneManager->getInstance(i);
             if (instance)
             {
-                // In a more advanced system, you would update per-instance uniforms here
-                // and call vkCmdDrawIndexed for each instance
-                vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
+                // Get the model for this instance
+                auto model = sceneManager->getModel(instance->getModelName());
+                if (model && model->hasBuffers())
+                {
+                    // Compute the model matrix for this instance
+                    glm::mat4 modelMatrix;
+                    if (i == 0) // Only rotate the first instance (instance1) around its own center
+                    {
+                        instance->setRotation(currentRotation);
+                        modelMatrix = instance->getModelMatrix();
+                    }
+                    else
+                    {
+                        modelMatrix = instance->getModelMatrix();
+                    }
+                    vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
+
+                    // Bind the model's vertex and index buffers
+                    VkBuffer vertexBuffers[] = {model->getVertexBuffer()};
+                    VkDeviceSize offsets[] = {0};
+                    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+                    vkCmdBindIndexBuffer(commandBuffer, model->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+                    // Draw the model with the correct index count
+                    vkCmdDrawIndexed(commandBuffer, model->getIndexCount(), 1, 0, 0, 0);
+                }
             }
         }
 
@@ -1649,11 +1627,7 @@ private:
 
     void updateUniformBuffer(uint32_t currentImage)
     {
-        // Convert quaternion to rotation matrix
-        glm::mat4 rotationMatrix = glm::mat4_cast(currentRotation);
-
         UniformBufferObject ubo{};
-        ubo.model = rotationMatrix;
         ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
                                glm::vec3(0.0f, 0.0f, 0.0f),
                                glm::vec3(0.0f, 0.0f, 1.0f));
@@ -2007,5 +1981,5 @@ int main()
         return EXIT_FAILURE;
     }
 
-    return EXIT_SUCCESS;
+return EXIT_SUCCESS;
 }

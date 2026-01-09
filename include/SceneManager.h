@@ -77,6 +77,19 @@ public:
         return nullptr;
     }
 
+    // Cleanup all models
+    void cleanupModels(VkDevice device)
+    {
+        for (auto &pair : models)
+        {
+            if (pair.second)
+            {
+                pair.second->cleanup(device);
+            }
+        }
+        models.clear();
+    }
+
 private:
     std::vector<std::shared_ptr<ModelInstance>> instances;
     std::map<std::string, std::shared_ptr<Model>> models;

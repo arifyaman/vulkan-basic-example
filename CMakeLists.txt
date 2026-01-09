@@ -15,14 +15,14 @@ find_package(Vulkan REQUIRED)
 
 # Add source files
 set(SOURCES
-    main.cpp
-    Model.cpp
+    src/main.cpp
+    src/Model.cpp
 )
 
 set(HEADERS
-    Model.h
-    ModelInstance.h
-    SceneManager.h
+    include/Model.h
+    include/ModelInstance.h
+    include/SceneManager.h
 )
 
 # Create executable
@@ -31,6 +31,7 @@ add_executable(vulkan_app ${SOURCES} ${HEADERS})
 # Include directories
 target_include_directories(vulkan_app PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/glfw-3.4/include
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/glm-1.0.3
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/stb-master

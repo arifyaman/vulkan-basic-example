@@ -8,18 +8,36 @@ class ModelInstance
 {
 public:
     explicit ModelInstance(const std::string &modelName = "default")
-        : name(modelName),
+        : modelName(modelName),
+          instanceName(modelName + "_instance"),
           position(0.0f),
           scale(1.0f),
           rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)) // Identity quaternion
     {
     }
 
+    // Constructor with separate model and instance names
+    ModelInstance(const std::string &model, const std::string &instance)
+        : modelName(model),
+          instanceName(instance),
+          position(0.0f),
+          scale(1.0f),
+          rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)) // Identity quaternion
+    {
+    }
+
+    // Model reference getters
+    const std::string &getModelName() const { return modelName; }
+    const std::string &getInstanceName() const { return instanceName; }
+
     // Transform getters
     const glm::vec3 &getPosition() const { return position; }
     const glm::vec3 &getScale() const { return scale; }
     const glm::quat &getRotation() const { return rotation; }
-    const std::string &getName() const { return name; }
+
+    // Model reference setters
+    void setModelName(const std::string &model) { modelName = model; }
+    void setInstanceName(const std::string &instance) { instanceName = instance; }
 
     // Transform setters
     void setPosition(const glm::vec3 &pos) { position = pos; }
@@ -42,7 +60,8 @@ public:
     }
 
 private:
-    std::string name;
+    std::string modelName;     // Name of the model this instance uses
+    std::string instanceName;  // Unique name for this instance
     glm::vec3 position;
     glm::vec3 scale;
     glm::quat rotation;
