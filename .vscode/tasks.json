@@ -44,7 +44,7 @@
       ],
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
       },
       "dependsOn": "CMake: Configure"
     },
