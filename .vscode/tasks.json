@@ -88,6 +88,19 @@
         "kind": "build",
         "isDefault": false
       }
+    },
+    {
+      "label": "Compile Shaders",
+      "type": "shell",
+      "command": "C:/VulkanSDK/1.4.335.0/Bin/glslc.exe shader.vert -o vert.spv; C:/VulkanSDK/1.4.335.0/Bin/glslc.exe shader.frag -o frag.spv",
+      "options": {
+        "cwd": "${workspaceFolder}/shaders"
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
     }
   ],
   "version": "2.0.0"
