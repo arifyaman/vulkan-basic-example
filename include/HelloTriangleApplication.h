@@ -74,7 +74,7 @@ struct UniformBufferObject
 {
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
-    alignas(16) glm::vec3 lightDir;
+    alignas(16) glm::vec4 directionalLight; // xyz = direction, w = intensity
     alignas(16) glm::vec3 cameraPos;
 };
 
@@ -251,7 +251,7 @@ private:
 
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
-    void loadModel();
+    void setupScene();
 
     void createUniformBuffers();
 

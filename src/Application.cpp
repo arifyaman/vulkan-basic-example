@@ -23,12 +23,38 @@ void HelloTriangleApplication::initVulkan()
     createTextureImage();
     createTextureImageView();
     createTextureSampler();
-    loadModel();
+    setupScene();
     createUniformBuffers();
     createDescriptorPool();
     createDescriptorSets();
     createCommandBuffers();
     createSyncObjects();
+}
+
+void HelloTriangleApplication::setupScene()
+{
+    // Create box model (using default 1x1x1 cube)
+    auto cubeModel = std::shared_ptr<Model>(Model::createBox(device, physicalDevice, commandPool, graphicsQueue));
+    sceneManager->setModel("cube", cubeModel);
+
+    // Create multiple instances of the cube with different scales and positions
+    auto instance1 = std::make_shared<ModelInstance>("cube", "instance_1");
+    instance1->setPosition(glm::vec3(-1.5f, 0.0f, 0.0f));
+    instance1->setScale(glm::vec3(2.0f, 2.0f, 2.0f)); // Smaller scale, left
+    instance1->setMaterial(Material::metal(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f))); // Red metal
+    sceneManager->addInstance(instance1);
+
+    auto instance2 = std::make_shared<ModelInstance>("cube", "instance_2");
+    instance2->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+    instance2->setScale(glm::vec3(1.0f, 1.0f, 1.0f)); // Normal scale, center
+    instance2->setMaterial(Material::metal(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); // Green metal
+    sceneManager->addInstance(instance2);
+
+    auto instance3 = std::make_shared<ModelInstance>("cube", "instance_3");
+    instance3->setPosition(glm::vec3(1.5f, 0.0f, 0.0f));
+    instance3->setScale(glm::vec3(1.5f, 1.5f, 1.5f)); // Larger scale, right
+    instance3->setMaterial(Material::metal(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f))); // Blue metal
+    sceneManager->addInstance(instance3);
 }
 
 void HelloTriangleApplication::mainLoop()

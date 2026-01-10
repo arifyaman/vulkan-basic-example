@@ -3,12 +3,13 @@
 layout(push_constant) uniform PushConstants {
     mat4 model;
     vec4 baseColor;
+    vec4 specularData; // rgb = specularColor, a = shininess
 } pc;
 
 layout(binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
-    vec3 lightDir;
+    vec4 directionalLight; // xyz = direction, w = intensity
     vec3 cameraPos;
 } ubo;
 
@@ -21,9 +22,10 @@ layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
 layout(location = 2) out vec4 fragBaseColor;
 layout(location = 3) out vec3 fragNormal;
-layout(location = 4) out vec3 fragLightDir;
+layout(location = 4) out vec4 fragDirectionalLight;
 layout(location = 5) out vec3 fragWorldPos;
 layout(location = 6) out vec3 fragCameraPos;
+layout(location = 7) out vec4 fragSpecularData;
 
 void main() {
     vec4 worldPos = pc.model * vec4(inPosition, 1.0);
@@ -33,7 +35,8 @@ void main() {
     fragBaseColor = pc.baseColor;
     // Transform normal to world space (assuming uniform scaling)
     fragNormal = mat3(pc.model) * inNormal;
-    fragLightDir = ubo.lightDir;
+    fragDirectionalLight = ubo.directionalLight;
     fragWorldPos = worldPos.xyz;
     fragCameraPos = ubo.cameraPos;
+    fragSpecularData = pc.specularData;
 }

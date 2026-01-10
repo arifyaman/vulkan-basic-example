@@ -11,16 +11,20 @@
 class SceneManager
 {
 public:
-    SceneManager() : directionalLightDir(glm::normalize(glm::vec3(0.5f, -0.8f, 0.3f))), camera(std::make_shared<Camera>()) {}
+    SceneManager() : directionalLight(glm::vec4(glm::normalize(glm::vec3(0.5f, -0.8f, 0.3f)), 1.0f)), camera(std::make_shared<Camera>()) {}
     ~SceneManager() = default;
 
     // Camera
     std::shared_ptr<Camera> getCamera() { return camera; }
     const std::shared_ptr<Camera> getCamera() const { return camera; }
 
-    // Directional light
-    void setDirectionalLight(const glm::vec3 &direction) { directionalLightDir = glm::normalize(direction); }
-    const glm::vec3 &getDirectionalLight() const { return directionalLightDir; }
+    // Directional light (xyz = direction, w = intensity)
+    void setDirectionalLight(const glm::vec3 &direction, float intensity = 1.0f) { 
+        directionalLight = glm::vec4(glm::normalize(direction), intensity); 
+    }
+    const glm::vec4 &getDirectionalLight() const { return directionalLight; }
+    void setDirectionalLightIntensity(float intensity) { directionalLight.w = intensity; }
+    float getDirectionalLightIntensity() const { return directionalLight.w; }
 
     // Add a new instance to the scene
     void addInstance(const std::shared_ptr<ModelInstance> &instance)
@@ -102,6 +106,6 @@ public:
 private:
     std::vector<std::shared_ptr<ModelInstance>> instances;
     std::map<std::string, std::shared_ptr<Model>> models;
-    glm::vec3 directionalLightDir;
+    glm::vec4 directionalLight; // xyz = direction, w = intensity
     std::shared_ptr<Camera> camera;
 };

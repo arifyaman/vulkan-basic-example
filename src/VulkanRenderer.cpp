@@ -266,7 +266,7 @@ void HelloTriangleApplication::createGraphicsPipeline()
     VkPushConstantRange pushConstantRange{};
     pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(glm::mat4) + sizeof(glm::vec4); // mat4 + vec4
+    pushConstantRange.size = sizeof(glm::mat4) + sizeof(glm::vec4) + sizeof(glm::vec4); // mat4 + baseColor + specularColor+shininess
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -691,32 +691,6 @@ void HelloTriangleApplication::copyBufferToImage(VkBuffer buffer, VkImage image,
     endSingleTimeCommands(commandBuffer);
 }
 
-void HelloTriangleApplication::loadModel()
-{
-    // Create box model (using default 1x1x1 cube)
-    auto cubeModel = std::shared_ptr<Model>(Model::createBox(device, physicalDevice, commandPool, graphicsQueue));
-    sceneManager->setModel("cube", cubeModel);
-
-    // Create multiple instances of the cube with different scales and positions
-    auto instance1 = std::make_shared<ModelInstance>("cube", "instance_1");
-    instance1->setPosition(glm::vec3(-1.5f, 0.0f, 0.0f));
-    instance1->setScale(glm::vec3(0.5f, 0.5f, 0.5f)); // Smaller scale, left
-    instance1->setBaseColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)); // Red
-    sceneManager->addInstance(instance1);
-
-    auto instance2 = std::make_shared<ModelInstance>("cube", "instance_2");
-    instance2->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-    instance2->setScale(glm::vec3(1.0f, 1.0f, 1.0f)); // Normal scale, center
-    instance2->setBaseColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)); // Green
-    sceneManager->addInstance(instance2);
-
-    auto instance3 = std::make_shared<ModelInstance>("cube", "instance_3");
-    instance3->setPosition(glm::vec3(1.5f, 0.0f, 0.0f));
-    instance3->setScale(glm::vec3(1.5f, 1.5f, 1.5f)); // Larger scale, right
-    instance3->setBaseColor(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)); // Blue
-    sceneManager->addInstance(instance3);
-}
-
 void HelloTriangleApplication::createUniformBuffers()
 {
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
@@ -976,9 +950,11 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer commandBuffer
                 }
                 vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
                 
-                // Push base color
-                glm::vec4 baseColor = instance->getBaseColor();
-                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::mat4), sizeof(glm::vec4), &baseColor);
+                // Push material properties
+                const Material &material = instance->getMaterial();
+                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::mat4), sizeof(glm::vec4), &material.baseColor);
+                glm::vec4 specularData(material.specularColor, material.shininess);
+                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::mat4) + sizeof(glm::vec4), sizeof(glm::vec4), &specularData);
 
                 // Bind the model's vertex and index buffers
                 VkBuffer vertexBuffers[] = {model->getVertexBuffer()};
@@ -1034,7 +1010,7 @@ void HelloTriangleApplication::updateUniformBuffer(uint32_t currentImage)
     UniformBufferObject ubo{};
     ubo.view = camera->getViewMatrix();
     ubo.proj = camera->getProjectionMatrix();
-    ubo.lightDir = sceneManager->getDirectionalLight();
+    ubo.directionalLight = sceneManager->getDirectionalLight();
     ubo.cameraPos = camera->getPosition();
 
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));

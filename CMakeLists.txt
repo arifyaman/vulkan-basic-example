@@ -89,6 +89,10 @@ target_compile_definitions(vulkan_app PRIVATE
 
 # Optimization flags for Release build
 if(MSVC)
+    # Use Multi-threaded DLL runtime library
+    set_property(TARGET vulkan_app PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    
     target_compile_options(vulkan_app PRIVATE
         $<$<CONFIG:Release>:/O2>
         $<$<CONFIG:Debug>:/Zi>
