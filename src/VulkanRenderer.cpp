@@ -1035,6 +1035,7 @@ void HelloTriangleApplication::updateUniformBuffer(uint32_t currentImage)
     ubo.view = camera->getViewMatrix();
     ubo.proj = camera->getProjectionMatrix();
     ubo.lightDir = sceneManager->getDirectionalLight();
+    ubo.cameraPos = camera->getPosition();
 
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }
