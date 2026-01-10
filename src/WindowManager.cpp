@@ -1,5 +1,5 @@
 // WindowManager.cpp - Window creation and input handling
-#include "include/HelloTriangleApplication.h"
+#include "headers/HelloTriangleApplication.h"
 
 void HelloTriangleApplication::initWindow()
 {

@@ -30,9 +30,13 @@ set(SOURCES
 )
 
 set(HEADERS
-    include/Model.h
-    include/ModelInstance.h
-    include/SceneManager.h
+    src/headers/Camera.h
+    src/headers/HelloTriangleApplication.h
+    src/headers/Material.h
+    src/headers/Model.h
+    src/headers/ModelInstance.h
+    src/headers/SceneManager.h
+    src/headers/VulkanRenderer.h
 )
 
 # Create executable
@@ -41,7 +45,7 @@ add_executable(vulkan_app ${SOURCES} ${HEADERS})
 # Include directories
 target_include_directories(vulkan_app PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/headers
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/glfw-3.4/include
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/glm-1.0.3
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/stb-master

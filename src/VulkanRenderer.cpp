@@ -2,8 +2,8 @@
 #include <stb_image.h>
 
 // VulkanRenderer.cpp - Vulkan rendering and resource management
-#include "include/VulkanRenderer.h"
-#include "include/HelloTriangleApplication.h"
+#include "headers/VulkanRenderer.h"
+#include "headers/HelloTriangleApplication.h"
 #include <fstream>
 #include <stdexcept>
 #include <algorithm>

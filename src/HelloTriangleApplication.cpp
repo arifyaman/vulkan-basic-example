@@ -1,5 +1,5 @@
 // HelloTriangleApplication.cpp - Main application logic
-#include "include/HelloTriangleApplication.h"
+#include "headers/HelloTriangleApplication.h"
 
 void HelloTriangleApplication::initVulkan()
 {

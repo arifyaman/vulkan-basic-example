@@ -1,5 +1,5 @@
 // VulkanInitializer.cpp - Vulkan instance, device, and surface setup
-#include "include/HelloTriangleApplication.h"
+#include "headers/HelloTriangleApplication.h"
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDebugUtilsMessengerEXT *pDebugMessenger)
 {
