@@ -5,6 +5,12 @@ project(VulkanExample)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Enable parallel compilation for MSVC
+if(MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP /FS")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MP /FS")
+endif()
+
 # Set output directories (build in build/ subdirectory)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -19,7 +25,7 @@ set(SOURCES
     src/Model.cpp
     src/WindowManager.cpp
     src/VulkanInitializer.cpp
-    src/Application.cpp
+    src/HelloTriangleApplication.cpp
     src/VulkanRenderer.cpp
 )
 
@@ -70,6 +76,9 @@ if(WIN32)
         
         # Set subsystem to Windows (no console)
         target_link_options(vulkan_app PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
+        
+        # Fix runtime library conflicts in Debug builds
+        target_link_options(vulkan_app PRIVATE $<$<CONFIG:Debug>:/NODEFAULTLIB:MSVCRT>)
     endif()
 elseif(UNIX)
     # Linux/macOS settings

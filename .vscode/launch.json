@@ -9,12 +9,6 @@
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
-      "environment": [
-        {
-          "name": "PATH",
-          "value": "${env:PATH};C:/VulkanSDK/1.4.335.0/Bin;${workspaceFolder}/build/bin"
-        }
-      ],
       "console": "integratedTerminal",
       "preLaunchTask": "CMake: Build Debug"
     },
@@ -26,12 +20,6 @@
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
-      "environment": [
-        {
-          "name": "PATH",
-          "value": "${env:PATH};C:/VulkanSDK/1.4.335.0/Bin;${workspaceFolder}/build/bin"
-        }
-      ],
       "console": "integratedTerminal"
     },
     {
@@ -42,14 +30,8 @@
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
-      "environment": [
-        {
-          "name": "PATH",
-          "value": "${env:PATH};C:/VulkanSDK/1.4.335.0/Bin;${workspaceFolder}/build/bin"
-        }
-      ],
       "console": "integratedTerminal",
-      "preLaunchTask": "Build Vulkan/GLFW Project"
+      "preLaunchTask": "CMake: Build Release"
     }
   ]
 }

@@ -1,4 +1,4 @@
-// Application.cpp - Main application logic
+// HelloTriangleApplication.cpp - Main application logic
 #include "include/HelloTriangleApplication.h"
 
 void HelloTriangleApplication::initVulkan()
@@ -11,28 +11,20 @@ void HelloTriangleApplication::initVulkan()
     createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
-    createSwapChain();
-    createImageViews();
-    createRenderPass();
-    createDescriptorSetLayout();
-    createGraphicsPipeline();
-    createCommandPool();
-    createColorResources();
-    createDepthResources();
-    createFramebuffers();
-    createTextureImage();
-    createTextureImageView();
-    createTextureSampler();
+    
+    // Create renderer
+    renderer = std::make_unique<VulkanRenderer>(physicalDevice, device, graphicsQueue, 
+                                                 presentQueue, surface, window, msaaSamples);
+    renderer->initialize();
+    
     setupScene();
-    createUniformBuffers();
-    createDescriptorPool();
-    createDescriptorSets();
-    createCommandBuffers();
-    createSyncObjects();
 }
 
 void HelloTriangleApplication::setupScene()
 {
+    // Get command pool from renderer
+    VkCommandPool commandPool = renderer->getCommandPool();
+    
     // Create box model (using default 1x1x1 cube)
     auto cubeModel = std::shared_ptr<Model>(Model::createBox(device, physicalDevice, commandPool, graphicsQueue));
     sceneManager->setModel("cube", cubeModel);
@@ -69,70 +61,19 @@ void HelloTriangleApplication::mainLoop()
 
         glfwPollEvents();
         updateRotation(deltaTime);
-        drawFrame();
+        renderer->drawFrame(sceneManager, currentRotation);
     }
 
     vkDeviceWaitIdle(device);
 }
 
-void HelloTriangleApplication::cleanupSwapChain()
-{
-    vkDestroyImageView(device, depthImageView, nullptr);
-    vkDestroyImage(device, depthImage, nullptr);
-    vkFreeMemory(device, depthImageMemory, nullptr);
-
-    vkDestroyImageView(device, colorImageView, nullptr);
-    vkDestroyImage(device, colorImage, nullptr);
-    vkFreeMemory(device, colorImageMemory, nullptr);
-
-    for (auto framebuffer : swapChainFramebuffers)
-    {
-        vkDestroyFramebuffer(device, framebuffer, nullptr);
-    }
-
-    for (auto imageView : swapChainImageViews)
-    {
-        vkDestroyImageView(device, imageView, nullptr);
-    }
-
-    vkDestroySwapchainKHR(device, swapChain, nullptr);
-}
-
 void HelloTriangleApplication::cleanup()
 {
-    cleanupSwapChain();
-
+    // Cleanup renderer (this will clean up all rendering resources)
+    renderer.reset();
+    
     // Cleanup all models
     sceneManager->cleanupModels(device);
-
-    vkDestroyPipeline(device, graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-    vkDestroyRenderPass(device, renderPass, nullptr);
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-    {
-        vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-        vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
-    }
-
-    vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-
-    vkDestroySampler(device, textureSampler, nullptr);
-    vkDestroyImageView(device, textureImageView, nullptr);
-
-    vkDestroyImage(device, textureImage, nullptr);
-    vkFreeMemory(device, textureImageMemory, nullptr);
-
-    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-    {
-        vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
-        vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
-        vkDestroyFence(device, inFlightFences[i], nullptr);
-    }
-
-    vkDestroyCommandPool(device, commandPool, nullptr);
 
     vkDestroyDevice(device, nullptr);
 
@@ -147,27 +88,6 @@ void HelloTriangleApplication::cleanup()
     glfwDestroyWindow(window);
 
     glfwTerminate();
-}
-
-void HelloTriangleApplication::recreateSwapChain()
-{
-    int width = 0, height = 0;
-    glfwGetFramebufferSize(window, &width, &height);
-    while (width == 0 || height == 0)
-    {
-        glfwGetFramebufferSize(window, &width, &height);
-        glfwWaitEvents();
-    }
-
-    vkDeviceWaitIdle(device);
-
-    cleanupSwapChain();
-
-    createSwapChain();
-    createImageViews();
-    createColorResources();
-    createDepthResources();
-    createFramebuffers();
 }
 
 void HelloTriangleApplication::updateRotation(float deltaTime)

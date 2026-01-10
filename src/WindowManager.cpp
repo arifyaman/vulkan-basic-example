@@ -69,5 +69,8 @@ void HelloTriangleApplication::handleCursorPos(double xpos, double ypos)
 void HelloTriangleApplication::framebufferResizeCallback(GLFWwindow *window, int width, int height)
 {
     auto app = reinterpret_cast<HelloTriangleApplication *>(glfwGetWindowUserPointer(window));
-    app->framebufferResized = true;
+    if (app->renderer)
+    {
+        app->renderer->setFramebufferResized(true);
+    }
 }
