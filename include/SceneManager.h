@@ -2,6 +2,7 @@
 
 #include "Model.h"
 #include "ModelInstance.h"
+#include "Camera.h"
 #include <map>
 #include <memory>
 #include <vector>
@@ -10,8 +11,16 @@
 class SceneManager
 {
 public:
-    SceneManager() = default;
+    SceneManager() : directionalLightDir(glm::normalize(glm::vec3(0.5f, -0.8f, 0.3f))), camera(std::make_shared<Camera>()) {}
     ~SceneManager() = default;
+
+    // Camera
+    std::shared_ptr<Camera> getCamera() { return camera; }
+    const std::shared_ptr<Camera> getCamera() const { return camera; }
+
+    // Directional light
+    void setDirectionalLight(const glm::vec3 &direction) { directionalLightDir = glm::normalize(direction); }
+    const glm::vec3 &getDirectionalLight() const { return directionalLightDir; }
 
     // Add a new instance to the scene
     void addInstance(const std::shared_ptr<ModelInstance> &instance)
@@ -93,4 +102,6 @@ public:
 private:
     std::vector<std::shared_ptr<ModelInstance>> instances;
     std::map<std::string, std::shared_ptr<Model>> models;
+    glm::vec3 directionalLightDir;
+    std::shared_ptr<Camera> camera;
 };

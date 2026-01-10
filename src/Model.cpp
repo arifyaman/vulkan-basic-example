@@ -8,6 +8,75 @@ Model::Model(VkDevice device, VkPhysicalDevice physicalDevice, VkCommandPool com
     // Constructor - Vulkan resources will be created later when createBuffers is called
 }
 
+Model* Model::createBox(VkDevice device, VkPhysicalDevice physicalDevice, VkCommandPool commandPool, VkQueue graphicsQueue, float width, float height, float depth)
+{
+    Model* model = new Model(device, physicalDevice, commandPool, graphicsQueue);
+    
+    float halfWidth = width * 0.5f;
+    float halfHeight = height * 0.5f;
+    float halfDepth = depth * 0.5f;
+    
+    // Define box vertices with normals (24 vertices - 4 per face for proper normals)
+    model->vertices = {
+        // Front face (z = +halfDepth, normal = 0, 0, 1)
+        {{-halfWidth, -halfHeight,  halfDepth}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+        {{ halfWidth, -halfHeight,  halfDepth}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+        {{ halfWidth,  halfHeight,  halfDepth}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
+        {{-halfWidth,  halfHeight,  halfDepth}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
+        
+        // Back face (z = -halfDepth, normal = 0, 0, -1)
+        {{ halfWidth, -halfHeight, -halfDepth}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}},
+        {{-halfWidth, -halfHeight, -halfDepth}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, -1.0f}},
+        {{-halfWidth,  halfHeight, -halfDepth}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, -1.0f}},
+        {{ halfWidth,  halfHeight, -halfDepth}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, -1.0f}},
+        
+        // Left face (x = -halfWidth, normal = -1, 0, 0)
+        {{-halfWidth, -halfHeight, -halfDepth}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}},
+        {{-halfWidth, -halfHeight,  halfDepth}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}},
+        {{-halfWidth,  halfHeight,  halfDepth}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}},
+        {{-halfWidth,  halfHeight, -halfDepth}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}},
+        
+        // Right face (x = +halfWidth, normal = 1, 0, 0)
+        {{ halfWidth, -halfHeight,  halfDepth}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+        {{ halfWidth, -halfHeight, -halfDepth}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+        {{ halfWidth,  halfHeight, -halfDepth}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
+        {{ halfWidth,  halfHeight,  halfDepth}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
+        
+        // Top face (y = +halfHeight, normal = 0, 1, 0)
+        {{-halfWidth,  halfHeight,  halfDepth}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+        {{ halfWidth,  halfHeight,  halfDepth}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+        {{ halfWidth,  halfHeight, -halfDepth}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
+        {{-halfWidth,  halfHeight, -halfDepth}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
+        
+        // Bottom face (y = -halfHeight, normal = 0, -1, 0)
+        {{-halfWidth, -halfHeight, -halfDepth}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}},
+        {{ halfWidth, -halfHeight, -halfDepth}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}},
+        {{ halfWidth, -halfHeight,  halfDepth}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}},
+        {{-halfWidth, -halfHeight,  halfDepth}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}}
+    };
+    
+    // Define cube indices (updated for 24 vertices)
+    model->indices = {
+        // Front face
+        0, 1, 2,  2, 3, 0,
+        // Back face
+        4, 5, 6,  6, 7, 4,
+        // Left face
+        8, 9, 10,  10, 11, 8,
+        // Right face
+        12, 13, 14,  14, 15, 12,
+        // Top face
+        16, 17, 18,  18, 19, 16,
+        // Bottom face
+        20, 21, 22,  22, 23, 20
+    };
+    
+    // Create Vulkan buffers
+    model->createBuffers(device, physicalDevice, commandPool, graphicsQueue);
+    
+    return model;
+}
+
 Model::~Model()
 {
     // Destructor - Vulkan resources should be cleaned up by calling cleanup()

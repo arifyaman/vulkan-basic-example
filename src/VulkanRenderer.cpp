@@ -264,9 +264,9 @@ void HelloTriangleApplication::createGraphicsPipeline()
     dynamicState.pDynamicStates = dynamicStates.data();
 
     VkPushConstantRange pushConstantRange{};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(glm::mat4);
+    pushConstantRange.size = sizeof(glm::mat4) + sizeof(glm::vec4); // mat4 + vec4
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -693,26 +693,27 @@ void HelloTriangleApplication::copyBufferToImage(VkBuffer buffer, VkImage image,
 
 void HelloTriangleApplication::loadModel()
 {
-    // Load viking room model
-    auto vikingRoomModel = std::make_shared<Model>(device, physicalDevice, commandPool, graphicsQueue);
-    vikingRoomModel->loadFromFile(MODEL_PATH);
-    vikingRoomModel->createBuffers(device, physicalDevice, commandPool, graphicsQueue);
-    sceneManager->setModel("viking_room", vikingRoomModel);
+    // Create box model (using default 1x1x1 cube)
+    auto cubeModel = std::shared_ptr<Model>(Model::createBox(device, physicalDevice, commandPool, graphicsQueue));
+    sceneManager->setModel("cube", cubeModel);
 
-    // Create multiple instances of the same model with different scales and positions
-    auto instance1 = std::make_shared<ModelInstance>("viking_room", "instance_1");
+    // Create multiple instances of the cube with different scales and positions
+    auto instance1 = std::make_shared<ModelInstance>("cube", "instance_1");
     instance1->setPosition(glm::vec3(-1.5f, 0.0f, 0.0f));
     instance1->setScale(glm::vec3(0.5f, 0.5f, 0.5f)); // Smaller scale, left
+    instance1->setBaseColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)); // Red
     sceneManager->addInstance(instance1);
 
-    auto instance2 = std::make_shared<ModelInstance>("viking_room", "instance_2");
+    auto instance2 = std::make_shared<ModelInstance>("cube", "instance_2");
     instance2->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
     instance2->setScale(glm::vec3(1.0f, 1.0f, 1.0f)); // Normal scale, center
+    instance2->setBaseColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)); // Green
     sceneManager->addInstance(instance2);
 
-    auto instance3 = std::make_shared<ModelInstance>("viking_room", "instance_3");
+    auto instance3 = std::make_shared<ModelInstance>("cube", "instance_3");
     instance3->setPosition(glm::vec3(1.5f, 0.0f, 0.0f));
     instance3->setScale(glm::vec3(1.5f, 1.5f, 1.5f)); // Larger scale, right
+    instance3->setBaseColor(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)); // Blue
     sceneManager->addInstance(instance3);
 }
 
@@ -974,6 +975,10 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer commandBuffer
                     modelMatrix = instance->getModelMatrix();
                 }
                 vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
+                
+                // Push base color
+                glm::vec4 baseColor = instance->getBaseColor();
+                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::mat4), sizeof(glm::vec4), &baseColor);
 
                 // Bind the model's vertex and index buffers
                 VkBuffer vertexBuffers[] = {model->getVertexBuffer()};
@@ -1021,14 +1026,15 @@ void HelloTriangleApplication::createSyncObjects()
 
 void HelloTriangleApplication::updateUniformBuffer(uint32_t currentImage)
 {
+    auto camera = sceneManager->getCamera();
+    
+    // Update camera aspect ratio
+    camera->setAspectRatio(swapChainExtent.width / (float)swapChainExtent.height);
+    
     UniformBufferObject ubo{};
-    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
-                           glm::vec3(0.0f, 0.0f, 0.0f),
-                           glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.proj = glm::perspective(glm::radians(45.0f),
-                                swapChainExtent.width / (float)swapChainExtent.height,
-                                0.1f, 10.0f);
-    ubo.proj[1][1] *= -1;
+    ubo.view = camera->getViewMatrix();
+    ubo.proj = camera->getProjectionMatrix();
+    ubo.lightDir = sceneManager->getDirectionalLight();
 
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }

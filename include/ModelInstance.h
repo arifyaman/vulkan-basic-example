@@ -12,7 +12,8 @@ public:
           instanceName(modelName + "_instance"),
           position(0.0f),
           scale(1.0f),
-          rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)) // Identity quaternion
+          rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)), // Identity quaternion
+          baseColor(1.0f, 1.0f, 1.0f, 1.0f) // White
     {
     }
 
@@ -22,7 +23,8 @@ public:
           instanceName(instance),
           position(0.0f),
           scale(1.0f),
-          rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)) // Identity quaternion
+          rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)), // Identity quaternion
+          baseColor(1.0f, 1.0f, 1.0f, 1.0f) // White
     {
     }
 
@@ -34,6 +36,7 @@ public:
     const glm::vec3 &getPosition() const { return position; }
     const glm::vec3 &getScale() const { return scale; }
     const glm::quat &getRotation() const { return rotation; }
+    const glm::vec4 &getBaseColor() const { return baseColor; }
 
     // Model reference setters
     void setModelName(const std::string &model) { modelName = model; }
@@ -43,6 +46,7 @@ public:
     void setPosition(const glm::vec3 &pos) { position = pos; }
     void setScale(const glm::vec3 &s) { scale = s; }
     void setRotation(const glm::quat &rot) { rotation = glm::normalize(rot); }
+    void setBaseColor(const glm::vec4 &color) { baseColor = color; }
 
     // Transform modifiers
     void translate(const glm::vec3 &offset) { position += offset; }
@@ -65,4 +69,5 @@ private:
     glm::vec3 position;
     glm::vec3 scale;
     glm::quat rotation;
+    glm::vec4 baseColor;       // Base color for this instance (RGBA)
 };
