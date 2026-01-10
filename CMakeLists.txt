@@ -19,7 +19,7 @@ set(SOURCES
     src/Model.cpp
     src/WindowManager.cpp
     src/VulkanInitializer.cpp
-    src/Application.cpp
+    src/HelloTriangleApplication.cpp
     src/VulkanRenderer.cpp
 )
 

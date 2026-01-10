@@ -1,4 +1,4 @@
-// Application.cpp - Main application logic
+// HelloTriangleApplication.cpp - Main application logic
 #include "include/HelloTriangleApplication.h"
 
 void HelloTriangleApplication::initVulkan()
