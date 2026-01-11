@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 VulkanRenderer::VulkanRenderer(VkPhysicalDevice physicalDevice, VkDevice device, 
                                VkQueue graphicsQueue, VkQueue presentQueue, 
@@ -24,7 +25,6 @@ VulkanRenderer::VulkanRenderer(VkPhysicalDevice physicalDevice, VkDevice device,
     , renderPass(VK_NULL_HANDLE)
     , descriptorSetLayout(VK_NULL_HANDLE)
     , pipelineLayout(VK_NULL_HANDLE)
-    , graphicsPipeline(VK_NULL_HANDLE)
     , commandPool(VK_NULL_HANDLE)
     , colorImage(VK_NULL_HANDLE)
     , colorImageMemory(VK_NULL_HANDLE)
@@ -47,6 +47,7 @@ VulkanRenderer::~VulkanRenderer()
 
 void VulkanRenderer::initialize()
 {
+    startTime = glfwGetTime();
     createSwapChain();
     createImageViews();
     createRenderPass();
@@ -70,7 +71,13 @@ void VulkanRenderer::cleanup()
 {
     cleanupSwapChain();
     
-    vkDestroyPipeline(device, graphicsPipeline, nullptr);
+    // Destroy all graphics pipelines
+    for (auto& pair : graphicsPipelines)
+    {
+        vkDestroyPipeline(device, pair.second, nullptr);
+    }
+    graphicsPipelines.clear();
+    
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
     
@@ -405,8 +412,39 @@ void VulkanRenderer::createDescriptorSetLayout()
 
 void VulkanRenderer::createGraphicsPipeline()
 {
-    auto vertShaderCode = readFile("shaders/vert.spv");
-    auto fragShaderCode = readFile("shaders/frag.spv");
+    // Default: create only the base shader
+    createGraphicsPipeline("shader");
+}
+
+void VulkanRenderer::createGraphicsPipelines(const std::vector<std::string>& shaderNames)
+{
+    // Create pipeline for each requested shader
+    for (const auto& shaderName : shaderNames)
+    {
+        try
+        {
+            createGraphicsPipeline(shaderName);
+        }
+        catch (const std::exception& e)
+        {
+            // Log error but continue with other shaders
+            std::cerr << "Warning: Failed to create pipeline for shader '" << shaderName << "': " << e.what() << std::endl;
+        }
+    }
+    
+    if (graphicsPipelines.empty())
+    {
+        throw std::runtime_error("No graphics pipelines were created! Check that shader files exist in shaders/ directory.");
+    }
+}
+
+void VulkanRenderer::createGraphicsPipeline(const std::string& shaderName)
+{
+    std::string vertPath = "shaders/" + shaderName + "_vert.spv";
+    std::string fragPath = "shaders/" + shaderName + "_frag.spv";
+    
+    auto vertShaderCode = readFile(vertPath);
+    auto fragShaderCode = readFile(fragPath);
 
     VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
     VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
@@ -526,10 +564,13 @@ void VulkanRenderer::createGraphicsPipeline()
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
+    VkPipeline pipeline;
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS)
     {
         throw std::runtime_error("failed to create graphics pipeline!");
     }
+    
+    graphicsPipelines[shaderName] = pipeline;
 
     vkDestroyShaderModule(device, fragShaderModule, nullptr);
     vkDestroyShaderModule(device, vertShaderModule, nullptr);
@@ -1139,8 +1180,6 @@ void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
@@ -1157,6 +1196,8 @@ void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
 
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 
+    std::string currentPipeline = "";
+    
     // Render all instances in the scene
     for (size_t i = 0; i < sceneManager->getInstanceCount(); ++i)
     {
@@ -1167,6 +1208,24 @@ void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
             auto model = sceneManager->getModel(instance->getModelName());
             if (model && model->hasBuffers())
             {
+                const Material &material = instance->getMaterial();
+                
+                // Switch pipeline if needed
+                if (currentPipeline != material.shaderName)
+                {
+                    currentPipeline = material.shaderName;
+                    auto pipelineIt = graphicsPipelines.find(currentPipeline);
+                    if (pipelineIt != graphicsPipelines.end())
+                    {
+                        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineIt->second);
+                    }
+                    else
+                    {
+                        // Fallback to default shader
+                        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines["shader"]);
+                    }
+                }
+                
                 // Compute the model matrix for this instance
                 glm::mat4 modelMatrix;
                 if (i == 0) // Only rotate the first instance (instance1) around its own center
@@ -1180,11 +1239,28 @@ void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
                 }
                 vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
                 
-                // Push material properties
-                const Material &material = instance->getMaterial();
-                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::mat4), sizeof(glm::vec4), &material.baseColor);
-                glm::vec4 specularData(material.specularColor, material.shininess);
-                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::mat4) + sizeof(glm::vec4), sizeof(glm::vec4), &specularData);
+                // Push material properties (base color always first)
+                uint32_t offset = sizeof(glm::mat4);
+                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, offset, sizeof(glm::vec4), &material.baseColor);
+                offset += sizeof(glm::vec4);
+                
+                // Push dynamic shader parameters
+                const ShaderParameterSet& shaderParams = material.getShaderParams();
+                for (const auto& param : shaderParams.getAll())
+                {
+                    if (param.getType() != ShaderParameterType::Texture)
+                    {
+                        uint32_t paramSize = static_cast<uint32_t>(param.getPushConstantSize());
+                        
+                        // Create a temporary buffer for the parameter data
+                        alignas(16) uint8_t buffer[16]; // Max size for vec4
+                        param.writeToPushConstant(buffer);
+                        
+                        vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 
+                                         offset, paramSize, buffer);
+                        offset += paramSize;
+                    }
+                }
 
                 // Bind the model's vertex and index buffers
                 VkBuffer vertexBuffers[] = {model->getVertexBuffer()};
@@ -1242,6 +1318,7 @@ void VulkanRenderer::updateUniformBuffer(uint32_t currentImage, std::shared_ptr<
     ubo.proj = camera->getProjectionMatrix();
     ubo.directionalLight = sceneManager->getDirectionalLight();
     ubo.cameraPos = camera->getPosition();
+    ubo.time = static_cast<float>(glfwGetTime() - startTime);
 
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }

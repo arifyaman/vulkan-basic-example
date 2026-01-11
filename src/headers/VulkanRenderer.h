@@ -8,9 +8,11 @@
 #include <memory>
 #include <array>
 #include <optional>
+#include <unordered_map>
 
 #include "Model.h"
 #include "SceneManager.h"
+#include "ShaderParameter.h"
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -39,6 +41,7 @@ struct UniformBufferObject
     alignas(16) glm::mat4 proj;
     alignas(16) glm::vec4 directionalLight; // xyz = direction, w = intensity
     alignas(16) glm::vec3 cameraPos;
+    alignas(4) float time; // Time in seconds for animations
 };
 
 class VulkanRenderer
@@ -52,6 +55,9 @@ public:
     // Initialization
     void initialize();
     void cleanup();
+    
+    // Shader loading (call after initialize, before first frame)
+    void createGraphicsPipelines(const std::vector<std::string>& shaderNames);
     
     // Frame rendering
     void drawFrame(std::shared_ptr<SceneManager> sceneManager, glm::quat& currentRotation);
@@ -104,7 +110,7 @@ private:
     VkRenderPass renderPass;
     VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
-    VkPipeline graphicsPipeline;
+    std::unordered_map<std::string, VkPipeline> graphicsPipelines; // Multiple pipelines by shader name
     
     // Command buffers
     VkCommandPool commandPool;
@@ -148,6 +154,7 @@ private:
     double lastTime = 0.0;
     int frameCount = 0;
     double fps = 0.0;
+    double startTime = 0.0; // Application start time for animations
     
     // Internal methods
     void createSwapChain();
@@ -155,6 +162,7 @@ private:
     void createRenderPass();
     void createDescriptorSetLayout();
     void createGraphicsPipeline();
+    void createGraphicsPipeline(const std::string& shaderName); // Create pipeline for specific shader
     void createFramebuffers();
     void createCommandPool();
     void createColorResources();

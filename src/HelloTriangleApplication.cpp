@@ -17,6 +17,9 @@ void HelloTriangleApplication::initVulkan()
                                                  presentQueue, surface, window, msaaSamples);
     renderer->initialize();
     
+    // Load shaders needed by this application
+    renderer->createGraphicsPipelines({"shader", "custom"});
+    
     setupScene();
 }
 
@@ -39,7 +42,11 @@ void HelloTriangleApplication::setupScene()
     auto instance2 = std::make_shared<ModelInstance>("cube", "instance_2");
     instance2->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
     instance2->setScale(glm::vec3(1.0f, 1.0f, 1.0f)); // Normal scale, center
-    instance2->setMaterial(Material::metal(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); // Green metal
+    // Use custom shader that interpolates between green and yellow
+    instance2->setMaterial(Material::colorLerp(
+        glm::vec4(0.0f, 1.0f, 0.0f, 1.0f),  // Color 1: Green
+        glm::vec4(1.0f, 1.0f, 0.0f, 1.0f)   // Color 2: Yellow
+    ));
     sceneManager->addInstance(instance2);
 
     auto instance3 = std::make_shared<ModelInstance>("cube", "instance_3");

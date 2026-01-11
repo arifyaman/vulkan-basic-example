@@ -92,7 +92,7 @@
     {
       "label": "Compile Shaders",
       "type": "shell",
-      "command": "glslc.exe shader.vert -o vert.spv; glslc.exe shader.frag -o frag.spv",
+      "command": "Get-ChildItem -Filter *.vert,*.frag | ForEach-Object { $name = $_.Name; $outName = $name -replace '\\.(vert|frag)$', '_$1.spv'; glslc.exe $name -o $outName; Write-Host \"Compiled $name -> $outName\" }",
       "options": {
         "cwd": "${workspaceFolder}/shaders"
       },
