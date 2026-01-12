@@ -1,8 +1,8 @@
-#include "headers/HelloTriangleApplication.h"
+#include "headers/ExampleApplication.h"
 
 int main()
 {
-    HelloTriangleApplication app;
+    ExampleApplication app;
 
     try
     {

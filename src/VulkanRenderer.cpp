@@ -1,9 +1,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-// VulkanRenderer.cpp - Vulkan rendering and resource management
 #include "headers/VulkanRenderer.h"
-#include "headers/HelloTriangleApplication.h"
+#include "headers/ExampleApplication.h"
 #include <fstream>
 #include <stdexcept>
 #include <algorithm>

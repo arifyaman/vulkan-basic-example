@@ -25,13 +25,13 @@ set(SOURCES
     src/Model.cpp
     src/WindowManager.cpp
     src/VulkanInitializer.cpp
-    src/HelloTriangleApplication.cpp
+    src/ExampleApplication.cpp
     src/VulkanRenderer.cpp
 )
 
 set(HEADERS
     src/headers/Camera.h
-    src/headers/HelloTriangleApplication.h
+    src/headers/ExampleApplication.h
     src/headers/Material.h
     src/headers/Model.h
     src/headers/ModelInstance.h

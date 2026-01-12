@@ -1,7 +1,7 @@
 // WindowManager.cpp - Window creation and input handling
-#include "headers/HelloTriangleApplication.h"
+#include "headers/ExampleApplication.h"
 
-void HelloTriangleApplication::initWindow()
+void ExampleApplication::initWindow()
 {
     glfwInit();
 
@@ -16,19 +16,19 @@ void HelloTriangleApplication::initWindow()
     glfwSetCursorPosCallback(window, cursorPosCallback);
 }
 
-void HelloTriangleApplication::mouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
+void ExampleApplication::mouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
 {
-    auto app = reinterpret_cast<HelloTriangleApplication *>(glfwGetWindowUserPointer(window));
+    auto app = reinterpret_cast<ExampleApplication *>(glfwGetWindowUserPointer(window));
     app->handleMouseButton(button, action, mods);
 }
 
-void HelloTriangleApplication::cursorPosCallback(GLFWwindow *window, double xpos, double ypos)
+void ExampleApplication::cursorPosCallback(GLFWwindow *window, double xpos, double ypos)
 {
-    auto app = reinterpret_cast<HelloTriangleApplication *>(glfwGetWindowUserPointer(window));
+    auto app = reinterpret_cast<ExampleApplication *>(glfwGetWindowUserPointer(window));
     app->handleCursorPos(xpos, ypos);
 }
 
-void HelloTriangleApplication::handleMouseButton(int button, int action, int mods)
+void ExampleApplication::handleMouseButton(int button, int action, int mods)
 {
     if (button == GLFW_MOUSE_BUTTON_LEFT)
     {
@@ -44,7 +44,7 @@ void HelloTriangleApplication::handleMouseButton(int button, int action, int mod
     }
 }
 
-void HelloTriangleApplication::handleCursorPos(double xpos, double ypos)
+void ExampleApplication::handleCursorPos(double xpos, double ypos)
 {
     if (mousePressed)
     {
@@ -66,9 +66,9 @@ void HelloTriangleApplication::handleCursorPos(double xpos, double ypos)
     }
 }
 
-void HelloTriangleApplication::framebufferResizeCallback(GLFWwindow *window, int width, int height)
+void ExampleApplication::framebufferResizeCallback(GLFWwindow *window, int width, int height)
 {
-    auto app = reinterpret_cast<HelloTriangleApplication *>(glfwGetWindowUserPointer(window));
+    auto app = reinterpret_cast<ExampleApplication *>(glfwGetWindowUserPointer(window));
     if (app->renderer)
     {
         app->renderer->setFramebufferResized(true);

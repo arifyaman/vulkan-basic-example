@@ -1,7 +1,7 @@
-// HelloTriangleApplication.cpp - Main application logic
-#include "headers/HelloTriangleApplication.h"
+// ExampleApplication.cpp - Main application logic
+#include "headers/ExampleApplication.h"
 
-void HelloTriangleApplication::initVulkan()
+void ExampleApplication::initVulkan()
 {
     // Initialize scene manager
     sceneManager = std::make_shared<SceneManager>();
@@ -23,7 +23,7 @@ void HelloTriangleApplication::initVulkan()
     setupScene();
 }
 
-void HelloTriangleApplication::setupScene()
+void ExampleApplication::setupScene()
 {
     // Get command pool from renderer
     VkCommandPool commandPool = renderer->getCommandPool();
@@ -56,7 +56,7 @@ void HelloTriangleApplication::setupScene()
     sceneManager->addInstance(instance3);
 }
 
-void HelloTriangleApplication::mainLoop()
+void ExampleApplication::mainLoop()
 {
     auto lastTime = std::chrono::high_resolution_clock::now();
 
@@ -80,7 +80,7 @@ void HelloTriangleApplication::mainLoop()
     vkDeviceWaitIdle(device);
 }
 
-void HelloTriangleApplication::cleanup()
+void ExampleApplication::cleanup()
 {
     // Cleanup renderer (this will clean up all rendering resources)
     renderer.reset();
@@ -103,7 +103,7 @@ void HelloTriangleApplication::cleanup()
     glfwTerminate();
 }
 
-void HelloTriangleApplication::updateRotation(float deltaTime)
+void ExampleApplication::updateRotation(float deltaTime)
 {
     // Calculate SLERP factor (clamped between 0 and 1)
     float t = glm::clamp(slerpSpeed * deltaTime, 0.0f, 1.0f);
