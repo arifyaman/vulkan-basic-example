@@ -60,7 +60,7 @@ public:
     void createGraphicsPipelines(const std::vector<std::string>& shaderNames);
     
     // Frame rendering
-    void drawFrame(std::shared_ptr<SceneManager> sceneManager, glm::quat& currentRotation);
+    void drawFrame(std::shared_ptr<SceneManager> sceneManager);
     
     // Swap chain management
     void recreateSwapChain();
@@ -176,8 +176,8 @@ private:
     void createCommandBuffers();
     void createSyncObjects();
     
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, 
-                           std::shared_ptr<SceneManager> sceneManager, glm::quat& currentRotation);
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex,
+                           std::shared_ptr<SceneManager> sceneManager);
     void updateUniformBuffer(uint32_t currentImage, std::shared_ptr<SceneManager> sceneManager);
     
     VkShaderModule createShaderModule(const std::vector<char>& code);

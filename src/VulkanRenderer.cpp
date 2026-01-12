@@ -151,7 +151,7 @@ void VulkanRenderer::cleanupSwapChain()
     vkDestroySwapchainKHR(device, swapChain, nullptr);
 }
 
-void VulkanRenderer::drawFrame(std::shared_ptr<SceneManager> sceneManager, glm::quat& currentRotation)
+void VulkanRenderer::drawFrame(std::shared_ptr<SceneManager> sceneManager)
 {
     // Calculate FPS
     double currentTime = glfwGetTime();
@@ -190,7 +190,7 @@ void VulkanRenderer::drawFrame(std::shared_ptr<SceneManager> sceneManager, glm::
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
     
     vkResetCommandBuffer(commandBuffers[currentFrame], 0);
-    recordCommandBuffer(commandBuffers[currentFrame], imageIndex, sceneManager, currentRotation);
+    recordCommandBuffer(commandBuffers[currentFrame], imageIndex, sceneManager);
     
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1153,8 +1153,8 @@ void VulkanRenderer::createCommandBuffers()
     }
 }
 
-void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, 
-                                        std::shared_ptr<SceneManager> sceneManager, glm::quat& currentRotation)
+void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex,
+                                        std::shared_ptr<SceneManager> sceneManager)
 {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1226,17 +1226,8 @@ void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
                     }
                 }
                 
-                // Compute the model matrix for this instance
-                glm::mat4 modelMatrix;
-                if (i == 0) // Only rotate the first instance (instance1) around its own center
-                {
-                    instance->setRotation(currentRotation);
-                    modelMatrix = instance->getModelMatrix();
-                }
-                else
-                {
-                    modelMatrix = instance->getModelMatrix();
-                }
+                // Get the model matrix for this instance
+                glm::mat4 modelMatrix = instance->getModelMatrix();
                 vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
                 
                 // Push material properties (base color always first)
@@ -1470,4 +1461,3 @@ QueueFamilyIndices VulkanRenderer::findQueueFamilies(VkPhysicalDevice device)
 
     return indices;
 }
-

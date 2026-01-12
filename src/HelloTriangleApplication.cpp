@@ -68,7 +68,13 @@ void HelloTriangleApplication::mainLoop()
 
         glfwPollEvents();
         updateRotation(deltaTime);
-        renderer->drawFrame(sceneManager, currentRotation);
+
+        // Update the rotation of the first instance
+        if (auto instance = sceneManager->getInstance(0)) {
+            instance->setRotation(currentRotation);
+        }
+
+        renderer->drawFrame(sceneManager);
     }
 
     vkDeviceWaitIdle(device);
