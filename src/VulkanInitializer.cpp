@@ -1,5 +1,5 @@
 // VulkanInitializer.cpp - Vulkan instance, device, and surface setup
-#include "headers/ExampleApplication.h"
+#include "headers/VulkanInitializer.h"
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDebugUtilsMessengerEXT *pDebugMessenger)
 {
@@ -23,7 +23,51 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
     }
 }
 
-void ExampleApplication::createInstance()
+VulkanInitializer::VulkanInitializer()
+    : instance(VK_NULL_HANDLE),
+      debugMessenger(VK_NULL_HANDLE),
+      surface(VK_NULL_HANDLE),
+      physicalDevice(VK_NULL_HANDLE),
+      msaaSamples(VK_SAMPLE_COUNT_64_BIT),
+      device(VK_NULL_HANDLE),
+      graphicsQueue(VK_NULL_HANDLE),
+      presentQueue(VK_NULL_HANDLE)
+{
+}
+
+VulkanInitializer::~VulkanInitializer()
+{
+    cleanup();
+}
+
+void VulkanInitializer::initialize(GLFWwindow* window)
+{
+    createInstance();
+    setupDebugMessenger();
+    createSurface(window);
+    pickPhysicalDevice();
+    createLogicalDevice();
+}
+
+void VulkanInitializer::cleanup()
+{
+    if (enableValidationLayers)
+    {
+        DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+    }
+
+    vkDestroyDevice(device, nullptr);
+    vkDestroySurfaceKHR(instance, surface, nullptr);
+
+    if (enableValidationLayers)
+    {
+        DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+    }
+
+    vkDestroyInstance(instance, nullptr);
+}
+
+void VulkanInitializer::createInstance()
 {
     if (enableValidationLayers && !checkValidationLayerSupport())
     {
@@ -32,7 +76,7 @@ void ExampleApplication::createInstance()
 
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "Hello Triangle";
+    appInfo.pApplicationName = "Vulkan Example";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "No Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -67,7 +111,7 @@ void ExampleApplication::createInstance()
     }
 }
 
-void ExampleApplication::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo)
+void VulkanInitializer::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo)
 {
     createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -76,7 +120,7 @@ void ExampleApplication::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerC
     createInfo.pfnUserCallback = debugCallback;
 }
 
-void ExampleApplication::setupDebugMessenger()
+void VulkanInitializer::setupDebugMessenger()
 {
     if (!enableValidationLayers)
         return;
@@ -90,7 +134,7 @@ void ExampleApplication::setupDebugMessenger()
     }
 }
 
-void ExampleApplication::createSurface()
+void VulkanInitializer::createSurface(GLFWwindow* window)
 {
     if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
     {
@@ -98,7 +142,7 @@ void ExampleApplication::createSurface()
     }
 }
 
-void ExampleApplication::pickPhysicalDevice()
+void VulkanInitializer::pickPhysicalDevice()
 {
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
@@ -127,7 +171,7 @@ void ExampleApplication::pickPhysicalDevice()
     }
 }
 
-void ExampleApplication::createLogicalDevice()
+void VulkanInitializer::createLogicalDevice()
 {
     QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
@@ -178,7 +222,7 @@ void ExampleApplication::createLogicalDevice()
     vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 }
 
-bool ExampleApplication::checkValidationLayerSupport()
+bool VulkanInitializer::checkValidationLayerSupport()
 {
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
@@ -208,7 +252,7 @@ bool ExampleApplication::checkValidationLayerSupport()
     return true;
 }
 
-std::vector<const char *> ExampleApplication::getRequiredExtensions()
+std::vector<const char *> VulkanInitializer::getRequiredExtensions()
 {
     uint32_t glfwExtensionCount = 0;
     const char **glfwExtensions;
@@ -224,14 +268,14 @@ std::vector<const char *> ExampleApplication::getRequiredExtensions()
     return extensions;
 }
 
-VKAPI_ATTR VkBool32 VKAPI_CALL ExampleApplication::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
+VKAPI_ATTR VkBool32 VKAPI_CALL VulkanInitializer::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
 {
     std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
 
     return VK_FALSE;
 }
 
-VkSampleCountFlagBits ExampleApplication::getMaxUsableSampleCount()
+VkSampleCountFlagBits VulkanInitializer::getMaxUsableSampleCount()
 {
     VkPhysicalDeviceProperties physicalDeviceProperties;
     vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
@@ -265,7 +309,7 @@ VkSampleCountFlagBits ExampleApplication::getMaxUsableSampleCount()
     return VK_SAMPLE_COUNT_1_BIT;
 }
 
-bool ExampleApplication::isDeviceSuitable(VkPhysicalDevice device)
+bool VulkanInitializer::isDeviceSuitable(VkPhysicalDevice device)
 {
     QueueFamilyIndices indices = findQueueFamilies(device);
 
@@ -284,7 +328,7 @@ bool ExampleApplication::isDeviceSuitable(VkPhysicalDevice device)
     return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
 }
 
-bool ExampleApplication::checkDeviceExtensionSupport(VkPhysicalDevice device)
+bool VulkanInitializer::checkDeviceExtensionSupport(VkPhysicalDevice device)
 {
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
@@ -302,7 +346,7 @@ bool ExampleApplication::checkDeviceExtensionSupport(VkPhysicalDevice device)
     return requiredExtensions.empty();
 }
 
-QueueFamilyIndices ExampleApplication::findQueueFamilies(VkPhysicalDevice device)
+QueueFamilyIndices VulkanInitializer::findQueueFamilies(VkPhysicalDevice device)
 {
     QueueFamilyIndices indices;
 
@@ -339,7 +383,7 @@ QueueFamilyIndices ExampleApplication::findQueueFamilies(VkPhysicalDevice device
     return indices;
 }
 
-SwapChainSupportDetails ExampleApplication::querySwapChainSupport(VkPhysicalDevice device)
+SwapChainSupportDetails VulkanInitializer::querySwapChainSupport(VkPhysicalDevice device)
 {
     SwapChainSupportDetails details;
 

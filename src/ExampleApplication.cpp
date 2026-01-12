@@ -3,23 +3,28 @@
 
 void ExampleApplication::initVulkan()
 {
+    // Initialize Vulkan
+    vulkanInitializer = std::make_unique<VulkanInitializer>();
+    vulkanInitializer->initialize(window);
+
     // Initialize scene manager
     sceneManager = std::make_shared<SceneManager>();
 
-    createInstance();
-    setupDebugMessenger();
-    createSurface();
-    pickPhysicalDevice();
-    createLogicalDevice();
-    
     // Create renderer
-    renderer = std::make_unique<VulkanRenderer>(physicalDevice, device, graphicsQueue, 
-                                                 presentQueue, surface, window, msaaSamples);
+    renderer = std::make_unique<VulkanRenderer>(
+        vulkanInitializer->getPhysicalDevice(),
+        vulkanInitializer->getDevice(),
+        vulkanInitializer->getGraphicsQueue(),
+        vulkanInitializer->getPresentQueue(),
+        vulkanInitializer->getSurface(),
+        window,
+        vulkanInitializer->getMsaaSamples()
+    );
     renderer->initialize();
-    
+
     // Load shaders needed by this application
     renderer->createGraphicsPipelines({"shader", "custom"});
-    
+
     setupScene();
 }
 
@@ -27,9 +32,14 @@ void ExampleApplication::setupScene()
 {
     // Get command pool from renderer
     VkCommandPool commandPool = renderer->getCommandPool();
-    
+
     // Create box model (using default 1x1x1 cube)
-    auto cubeModel = std::shared_ptr<Model>(Model::createBox(device, physicalDevice, commandPool, graphicsQueue));
+    auto cubeModel = std::shared_ptr<Model>(Model::createBox(
+        vulkanInitializer->getDevice(),
+        vulkanInitializer->getPhysicalDevice(),
+        commandPool,
+        vulkanInitializer->getGraphicsQueue()
+    ));
     sceneManager->setModel("cube", cubeModel);
 
     // Create multiple instances of the cube with different scales and positions
@@ -77,29 +87,21 @@ void ExampleApplication::mainLoop()
         renderer->drawFrame(sceneManager);
     }
 
-    vkDeviceWaitIdle(device);
+    vkDeviceWaitIdle(vulkanInitializer->getDevice());
 }
 
 void ExampleApplication::cleanup()
 {
     // Cleanup renderer (this will clean up all rendering resources)
     renderer.reset();
-    
+
     // Cleanup all models
-    sceneManager->cleanupModels(device);
+    sceneManager->cleanupModels(vulkanInitializer->getDevice());
 
-    vkDestroyDevice(device, nullptr);
-
-    if (enableValidationLayers)
-    {
-        DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-    }
-
-    vkDestroySurfaceKHR(instance, surface, nullptr);
-    vkDestroyInstance(instance, nullptr);
+    // Cleanup Vulkan (this will destroy device, surface, instance, etc.)
+    vulkanInitializer->cleanup();
 
     glfwDestroyWindow(window);
-
     glfwTerminate();
 }
 

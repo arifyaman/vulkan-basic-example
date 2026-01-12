@@ -36,6 +36,7 @@ set(HEADERS
     src/headers/Model.h
     src/headers/ModelInstance.h
     src/headers/SceneManager.h
+    src/headers/VulkanInitializer.h
     src/headers/VulkanRenderer.h
 )
 
