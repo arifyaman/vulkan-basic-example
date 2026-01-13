@@ -4,6 +4,7 @@ layout(push_constant) uniform PushConstants {
     mat4 model;
     vec4 baseColor;
     vec4 specularData; // rgb = specularColor, a = shininess
+    float useTexture;  // 1.0 = use texture, 0.0 = use base color
 } pc;
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -26,6 +27,7 @@ layout(location = 4) out vec4 fragDirectionalLight;
 layout(location = 5) out vec3 fragWorldPos;
 layout(location = 6) out vec3 fragCameraPos;
 layout(location = 7) out vec4 fragSpecularData;
+layout(location = 8) out float fragUseTexture;
 
 void main() {
     vec4 worldPos = pc.model * vec4(inPosition, 1.0);
@@ -39,4 +41,5 @@ void main() {
     fragWorldPos = worldPos.xyz;
     fragCameraPos = ubo.cameraPos;
     fragSpecularData = pc.specularData;
+    fragUseTexture = pc.useTexture;
 }

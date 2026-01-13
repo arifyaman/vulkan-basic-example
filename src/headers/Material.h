@@ -9,13 +9,14 @@
 struct Material
 {
     std::string shaderName;       // Shader to use (e.g., "shader", "custom")
-    glm::vec4 baseColor;          // Diffuse/albedo color (RGBA)
+    glm::vec4 baseColor;          // Diffuse/albedo color (RGBA) - used when no texture
     glm::vec3 specularColor;      // Specular reflection color (RGB)
     float shininess;              // Specular shininess/glossiness
-    
+    std::string diffuseTexture;   // Path to diffuse texture file (empty = use baseColor)
+
     // Modern flexible shader parameters system
     ShaderParameterSet customParams;
-    
+
     // Legacy storage for backward compatibility (deprecated)
     std::unordered_map<std::string, glm::vec4> legacyParams;
 
@@ -34,6 +35,21 @@ struct Material
           baseColor(base),
           specularColor(specular),
           shininess(shine)
+    {
+        // Initialize shader params based on shader type
+        if (shader == "shader")
+        {
+            customParams.addVec4("specularData", glm::vec4(specularColor, shininess));
+        }
+    }
+
+    // Constructor with diffuse texture
+    Material(const std::string &shader, const std::string &texturePath, const glm::vec3 &specular = glm::vec3(1.0f), float shine = 32.0f)
+        : shaderName(shader),
+          baseColor(1.0f, 1.0f, 1.0f, 1.0f), // White base color when using texture
+          specularColor(specular),
+          shininess(shine),
+          diffuseTexture(texturePath)
     {
         // Initialize shader params based on shader type
         if (shader == "shader")
@@ -82,6 +98,18 @@ struct Material
     void setParamTexture(const std::string& name, uint32_t binding)
     {
         customParams.addTexture(name, binding);
+    }
+
+    // Convenience method for setting diffuse texture
+    void setDiffuseTexture(const std::string& texturePath)
+    {
+        diffuseTexture = texturePath;
+    }
+
+    // Check if material has a diffuse texture
+    bool hasDiffuseTexture() const
+    {
+        return !diffuseTexture.empty();
     }
     
     // Legacy setters for backward compatibility (deprecated)

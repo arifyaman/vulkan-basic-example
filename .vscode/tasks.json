@@ -92,7 +92,7 @@
     {
       "label": "Compile Shaders",
       "type": "shell",
-      "command": "Get-ChildItem -Filter *.vert,*.frag | ForEach-Object { $name = $_.Name; $outName = $name -replace '\\.(vert|frag)$', '_$1.spv'; glslc.exe $name -o $outName; Write-Host \"Compiled $name -> $outName\" }",
+      "command": "Get-ChildItem | Where-Object { $_.Extension -eq '.vert' -or $_.Extension -eq '.frag' } | ForEach-Object { $name = $_.Name; $outName = $name -replace '\\.(vert|frag)$', '_$1.spv'; glslc.exe $name -o $outName; Write-Host \"Compiled $name -> $outName\" }",
       "options": {
         "cwd": "${workspaceFolder}/shaders"
       },

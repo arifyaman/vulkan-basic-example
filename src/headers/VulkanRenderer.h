@@ -16,6 +16,19 @@
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
+// Forward declarations and shared structures
+struct QueueFamilyIndices;
+struct SwapChainSupportDetails;
+struct UniformBufferObject;
+
+// Texture resource structure
+struct TextureResource {
+    VkImage image;
+    VkDeviceMemory memory;
+    VkImageView view;
+    uint32_t mipLevels;
+};
+
 // Shared structures
 struct QueueFamilyIndices
 {
@@ -83,10 +96,14 @@ public:
     void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples,
                     VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, 
                     VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
-    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, 
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
                              VkImageLayout newLayout, uint32_t mipLevels);
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
     void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
+
+    // Texture management
+    void loadTexture(const std::string& texturePath);
+    void loadRequiredTextures(std::shared_ptr<SceneManager> sceneManager);
 
 private:
     // Vulkan handles (not owned by renderer)
@@ -147,8 +164,11 @@ private:
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
-    
+
     bool framebufferResized = false;
+
+    // Texture cache for dynamic texture loading
+    std::unordered_map<std::string, TextureResource> textureCache;
     
     // FPS tracking
     double lastTime = 0.0;

@@ -31,7 +31,8 @@ VulkanInitializer::VulkanInitializer()
       msaaSamples(VK_SAMPLE_COUNT_64_BIT),
       device(VK_NULL_HANDLE),
       graphicsQueue(VK_NULL_HANDLE),
-      presentQueue(VK_NULL_HANDLE)
+      presentQueue(VK_NULL_HANDLE),
+      isInitialized(false)
 {
 }
 
@@ -51,20 +52,29 @@ void VulkanInitializer::initialize(GLFWwindow* window)
 
 void VulkanInitializer::cleanup()
 {
-    if (enableValidationLayers)
+    if (device != VK_NULL_HANDLE)
     {
-        DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+        vkDestroyDevice(device, nullptr);
+        device = VK_NULL_HANDLE;
     }
 
-    vkDestroyDevice(device, nullptr);
-    vkDestroySurfaceKHR(instance, surface, nullptr);
-
-    if (enableValidationLayers)
+    if (surface != VK_NULL_HANDLE)
     {
-        DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+        vkDestroySurfaceKHR(instance, surface, nullptr);
+        surface = VK_NULL_HANDLE;
     }
 
-    vkDestroyInstance(instance, nullptr);
+    if (enableValidationLayers && debugMessenger != VK_NULL_HANDLE)
+    {
+        DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+        debugMessenger = VK_NULL_HANDLE;
+    }
+
+    if (instance != VK_NULL_HANDLE)
+    {
+        vkDestroyInstance(instance, nullptr);
+        instance = VK_NULL_HANDLE;
+    }
 }
 
 void VulkanInitializer::createInstance()

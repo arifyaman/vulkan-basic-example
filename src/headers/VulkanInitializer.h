@@ -73,6 +73,8 @@ private:
     VkQueue graphicsQueue;
     VkQueue presentQueue;
 
+    bool isInitialized;
+
     void createInstance();
     void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo);
     void setupDebugMessenger();

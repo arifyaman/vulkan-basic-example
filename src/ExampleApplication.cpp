@@ -26,6 +26,9 @@ void ExampleApplication::initVulkan()
     renderer->createGraphicsPipelines({"shader", "custom"});
 
     setupScene();
+
+    // Load textures required by materials
+    renderer->loadRequiredTextures(sceneManager);
 }
 
 void ExampleApplication::setupScene()
@@ -52,11 +55,11 @@ void ExampleApplication::setupScene()
     auto instance2 = std::make_shared<ModelInstance>("cube", "instance_2");
     instance2->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
     instance2->setScale(glm::vec3(1.0f, 1.0f, 1.0f)); // Normal scale, center
-    // Use custom shader that interpolates between green and yellow
-    instance2->setMaterial(Material::colorLerp(
-        glm::vec4(0.0f, 1.0f, 0.0f, 1.0f),  // Color 1: Green
-        glm::vec4(1.0f, 1.0f, 0.0f, 1.0f)   // Color 2: Yellow
-    ));
+    // Use texture material
+    Material textureMat("shader", "textures/viking_room.png");
+    textureMat.specularColor = glm::vec3(0.1f, 0.1f, 0.1f);
+    textureMat.shininess = 32.0f;
+    instance2->setMaterial(textureMat);
     sceneManager->addInstance(instance2);
 
     auto instance3 = std::make_shared<ModelInstance>("cube", "instance_3");

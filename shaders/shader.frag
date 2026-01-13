@@ -10,35 +10,44 @@ layout(location = 4) in vec4 fragDirectionalLight;
 layout(location = 5) in vec3 fragWorldPos;
 layout(location = 6) in vec3 fragCameraPos;
 layout(location = 7) in vec4 fragSpecularData;
+layout(location = 8) in float fragUseTexture; // 1.0 = use texture, 0.0 = use base color
 
 layout(location = 0) out vec4 outColor;
 
 void main() {
+    // Sample texture (always sample to avoid divergence)
+    vec4 textureColor = texture(texSampler, fragTexCoord) * fragBaseColor;
+
+    // Use mix() to blend between texture and base color based on useTexture flag
+    // When fragUseTexture = 1.0, use textureColor
+    // When fragUseTexture = 0.0, use fragBaseColor
+    vec4 diffuseColor = mix(fragBaseColor, textureColor, fragUseTexture);
+
     // Directional light from scene manager (xyz = direction, w = intensity)
     vec3 lightDir = normalize(fragDirectionalLight.xyz);
     float lightIntensity = fragDirectionalLight.w;
     vec3 normal = normalize(fragNormal);
     vec3 viewDir = normalize(fragCameraPos - fragWorldPos);
-    
+
     // Extract material properties
     vec3 specularColor = fragSpecularData.rgb;
     float shininess = fragSpecularData.a;
-    
+
     // Ambient lighting (constant background illumination)
     float ambient = 0.2;
-    
+
     // Diffuse lighting (scaled by directional light intensity)
     float diffuse = max(dot(normal, -lightDir), 0.0) * lightIntensity;
-    
+
     // Specular lighting (scaled by directional light intensity and material specular color)
     vec3 halfDir = normalize(-lightDir + viewDir);
     float specularStrength = pow(max(dot(normal, halfDir), 0.0), shininess) * lightIntensity;
     vec3 specular = specularStrength * specularColor;
-    
+
     // Combine lighting
-    vec3 diffuseContrib = fragBaseColor.rgb * (ambient + diffuse * 0.6);
+    vec3 diffuseContrib = diffuseColor.rgb * (ambient + diffuse * 0.6);
     vec3 finalColor = diffuseContrib + specular * 0.4;
-    
+
     // Apply to output
-    outColor = vec4(finalColor, fragBaseColor.a);
+    outColor = vec4(finalColor, diffuseColor.a);
 }

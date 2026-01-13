@@ -8,8 +8,9 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <unordered_map>
 
-VulkanRenderer::VulkanRenderer(VkPhysicalDevice physicalDevice, VkDevice device, 
+VulkanRenderer::VulkanRenderer(VkPhysicalDevice physicalDevice, VkDevice device,
                                VkQueue graphicsQueue, VkQueue presentQueue, 
                                VkSurfaceKHR surface, GLFWwindow* window,
                                VkSampleCountFlagBits msaaSamples)
@@ -36,6 +37,7 @@ VulkanRenderer::VulkanRenderer(VkPhysicalDevice physicalDevice, VkDevice device,
     , textureImageView(VK_NULL_HANDLE)
     , textureSampler(VK_NULL_HANDLE)
     , descriptorPool(VK_NULL_HANDLE)
+    , textureCache()
 {
 }
 
@@ -56,8 +58,7 @@ void VulkanRenderer::initialize()
     createColorResources();
     createDepthResources();
     createFramebuffers();
-    createTextureImage();
-    createTextureImageView();
+    // Note: Texture loading is now deferred until materials are known
     createTextureSampler();
     createUniformBuffers();
     createDescriptorPool();
@@ -532,7 +533,7 @@ void VulkanRenderer::createGraphicsPipeline(const std::string& shaderName)
     VkPushConstantRange pushConstantRange{};
     pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(glm::mat4) + sizeof(glm::vec4) + sizeof(glm::vec4); // mat4 + baseColor + specularColor+shininess
+    pushConstantRange.size = sizeof(glm::mat4) + sizeof(glm::vec4) + sizeof(glm::vec4) + sizeof(float); // mat4 + baseColor + specularData + useTexture
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -822,6 +823,78 @@ void VulkanRenderer::createTextureSampler()
     if (vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS)
     {
         throw std::runtime_error("failed to create texture sampler!");
+    }
+}
+
+void VulkanRenderer::loadTexture(const std::string& texturePath)
+{
+    // Check if texture is already loaded
+    if (textureCache.find(texturePath) != textureCache.end())
+    {
+        return; // Already loaded
+    }
+
+    int texWidth, texHeight, texChannels;
+    stbi_uc* pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+    uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+
+    if (!pixels)
+    {
+        throw std::runtime_error("failed to load texture image: " + texturePath);
+    }
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+    void* data;
+    vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
+    memcpy(data, pixels, static_cast<size_t>(imageSize));
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    stbi_image_free(pixels);
+
+    VkImage textureImage;
+    VkDeviceMemory textureImageMemory;
+    createImage(texWidth, texHeight, mipLevels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
+
+    transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
+    copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+    generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, mipLevels);
+
+    VkImageView textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
+
+    // Store in cache
+    TextureResource resource{textureImage, textureImageMemory, textureImageView, mipLevels};
+    textureCache[texturePath] = resource;
+}
+
+void VulkanRenderer::loadRequiredTextures(std::shared_ptr<SceneManager> sceneManager)
+{
+    // Collect all required textures from materials
+    for (size_t i = 0; i < sceneManager->getInstanceCount(); ++i)
+    {
+        auto instance = sceneManager->getInstance(i);
+        if (instance)
+        {
+            const Material& material = instance->getMaterial();
+            if (material.hasDiffuseTexture())
+            {
+                try
+                {
+                    loadTexture(material.diffuseTexture);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Warning: Failed to load texture '" << material.diffuseTexture << "': " << e.what() << std::endl;
+                }
+            }
+        }
     }
 }
 
@@ -1228,12 +1301,45 @@ void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
                 // Get the model matrix for this instance
                 glm::mat4 modelMatrix = instance->getModelMatrix();
                 vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
-                
+
                 // Push material properties (base color always first)
                 uint32_t offset = sizeof(glm::mat4);
                 vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, offset, sizeof(glm::vec4), &material.baseColor);
                 offset += sizeof(glm::vec4);
-                
+
+                // Push specular data
+                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, offset, sizeof(glm::vec4), &material.specularColor);
+                offset += sizeof(glm::vec4);
+
+                // Push use texture flag
+                float useTexture = material.hasDiffuseTexture() ? 1.0f : 0.0f;
+                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, offset, sizeof(float), &useTexture);
+                offset += sizeof(float);
+
+                // Bind texture if material has one
+                if (material.hasDiffuseTexture())
+                {
+                    auto textureIt = textureCache.find(material.diffuseTexture);
+                    if (textureIt != textureCache.end())
+                    {
+                        VkDescriptorImageInfo imageInfo{};
+                        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                        imageInfo.imageView = textureIt->second.view;
+                        imageInfo.sampler = textureSampler;
+
+                        VkWriteDescriptorSet descriptorWrite{};
+                        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                        descriptorWrite.dstSet = descriptorSets[currentFrame];
+                        descriptorWrite.dstBinding = 1;
+                        descriptorWrite.dstArrayElement = 0;
+                        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                        descriptorWrite.descriptorCount = 1;
+                        descriptorWrite.pImageInfo = &imageInfo;
+
+                        vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+                    }
+                }
+
                 // Push dynamic shader parameters
                 const ShaderParameterSet& shaderParams = material.getShaderParams();
                 for (const auto& param : shaderParams.getAll())
@@ -1241,12 +1347,12 @@ void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
                     if (param.getType() != ShaderParameterType::Texture)
                     {
                         uint32_t paramSize = static_cast<uint32_t>(param.getPushConstantSize());
-                        
+
                         // Create a temporary buffer for the parameter data
                         alignas(16) uint8_t buffer[16]; // Max size for vec4
                         param.writeToPushConstant(buffer);
-                        
-                        vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 
+
+                        vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
                                          offset, paramSize, buffer);
                         offset += paramSize;
                     }
