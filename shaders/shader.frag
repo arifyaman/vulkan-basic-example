@@ -8,6 +8,7 @@ layout(location = 3) in vec3 inViewPos;     // camera position (world)
 layout(location = 4) in vec3 inLightDir;    // direction TO light (normalized)
 layout(location = 5) in vec3 inLightColor;  // radiance
 layout(location = 6) in float inFog;
+layout(location = 7) in vec4 inFogColor;    // scene fog color
 
 layout(location = 0) out vec4 outFragColor;
 
@@ -21,9 +22,8 @@ layout(set = 0, binding = 3) uniform sampler2D u_emissiveTex;
 layout(push_constant) uniform PushConstants {
     layout(offset = 64) vec4 baseColorFactor;  // offset after mat4 model matrix
     layout(offset = 80) vec3 emissiveFactor;
-    layout(offset = 96) vec4 fogColor;
-    layout(offset = 112) float metallic;
-    layout(offset = 116) float roughness;
+    layout(offset = 96) float metallic;
+    layout(offset = 100) float roughness;
 } pc;
 
 const float PI = 3.14159265359;
@@ -111,7 +111,7 @@ void main()
 
     // ─────────────────────────────────────────
     // Fog
-    color = mix(color, pc.fogColor.rgb, inFog);
+    color = mix(color, inFogColor.rgb, inFog);
 
     outFragColor = vec4(color, baseColor.a);
 }

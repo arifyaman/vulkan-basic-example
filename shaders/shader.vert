@@ -10,6 +10,7 @@ layout(binding = 0) uniform UniformBufferObject {
     vec3 cameraPos;
     vec3 lightDir;     // direction TO light (normalized)
     vec3 lightColor;   // light radiance
+    vec4 fogColor;     // scene-wide fog color
     float fogDensity;  // fog density factor
 } ubo;
 
@@ -25,6 +26,7 @@ layout(location = 3) out vec3 outViewPos;     // camera position (world)
 layout(location = 4) out vec3 outLightDir;    // direction TO light (normalized)
 layout(location = 5) out vec3 outLightColor;  // radiance
 layout(location = 6) out float outFog;
+layout(location = 7) out vec4 outFogColor;    // scene fog color
 
 void main() {
     vec4 worldPos = pc.model * vec4(inPosition, 1.0);
@@ -37,6 +39,7 @@ void main() {
     outViewPos = ubo.cameraPos;
     outLightDir = ubo.lightDir;
     outLightColor = ubo.lightColor;
+    outFogColor = ubo.fogColor;
 
     // Simple fog based on distance
     float distance = length(ubo.cameraPos - worldPos.xyz);

@@ -14,7 +14,6 @@ struct Material
     // PBR Material Factors
     glm::vec4 baseColorFactor;    // Base color multiplier (RGBA) - default (1,1,1,1)
     glm::vec3 emissiveFactor;     // Emissive multiplier (RGB) - default (0,0,0)
-    glm::vec4 fogColor;           // Fog color (RGBA) - default (1.0,1.0,1.0,1.0)
     float metallic;               // Metallic factor (0.0 = dielectric, 1.0 = metal) - default 0.0
     float roughness;              // Roughness factor (0.0 = smooth, 1.0 = rough) - default 0.5
 
@@ -22,7 +21,6 @@ struct Material
     Material()
         : baseColorFactor(1.0f, 1.0f, 1.0f, 1.0f),
           emissiveFactor(0.0f, 0.0f, 0.0f),
-          fogColor(1.0f, 1.0f, 1.0f, 1.0f),
           metallic(0.0f),
           roughness(0.5f)
     {}
@@ -31,7 +29,6 @@ struct Material
     Material(const glm::vec4& baseColor)
         : baseColorFactor(baseColor),
           emissiveFactor(0.0f, 0.0f, 0.0f),
-          fogColor(1.0f, 1.0f, 1.0f, 1.0f),
           metallic(0.0f),
           roughness(0.5f)
     {}
@@ -41,7 +38,6 @@ struct Material
         : baseColorTexture(texturePath),
           baseColorFactor(1.0f, 1.0f, 1.0f, 1.0f),
           emissiveFactor(0.0f, 0.0f, 0.0f),
-          fogColor(1.0f, 1.0f, 1.0f, 1.0f),
           metallic(0.0f),
           roughness(0.5f)
     {}
@@ -52,7 +48,6 @@ struct Material
              const std::string& emissiveTex,
              const glm::vec4& baseColor = glm::vec4(1.0f),
              const glm::vec3& emissive = glm::vec3(0.0f),
-             const glm::vec4& fog = glm::vec4(0.5f, 0.7f, 1.0f, 1.0f),
              float metallicVal = 0.0f,
              float roughnessVal = 0.5f)
         : baseColorTexture(baseColorTex),
@@ -60,7 +55,6 @@ struct Material
           emissiveTexture(emissiveTex),
           baseColorFactor(baseColor),
           emissiveFactor(emissive),
-          fogColor(fog),
           metallic(metallicVal),
           roughness(roughnessVal)
     {}

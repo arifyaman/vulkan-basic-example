@@ -55,6 +55,7 @@ struct UniformBufferObject
     alignas(16) glm::vec3 cameraPos;
     alignas(16) glm::vec3 lightDir;     // direction TO light (normalized)
     alignas(16) glm::vec3 lightColor;   // light radiance
+    alignas(16) glm::vec4 fogColor;     // fog color (scene-wide)
     alignas(4) float fogDensity;        // fog density factor
 };
 

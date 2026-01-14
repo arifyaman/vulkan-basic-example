@@ -55,7 +55,6 @@ void ExampleApplication::setupScene()
     redMetal.baseColorTexture = ""; // No texture, use color only
     redMetal.baseColorFactor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
     redMetal.emissiveFactor = glm::vec3(0.0f, 0.0f, 0.0f);
-    redMetal.fogColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
     redMetal.metallic = 1.0f; // Full metal
     redMetal.roughness = 0.3f;
     instance1->setMaterial(redMetal);
@@ -69,7 +68,6 @@ void ExampleApplication::setupScene()
     pbrMat.baseColorTexture = "textures/viking_room.png";
     pbrMat.baseColorFactor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
     pbrMat.emissiveFactor = glm::vec3(0.0f, 0.0f, 0.0f);
-    pbrMat.fogColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
     pbrMat.metallic = 0.0f; // Not metal, just textured
     pbrMat.roughness = 0.5f;
     instance2->setMaterial(pbrMat);
@@ -83,7 +81,6 @@ void ExampleApplication::setupScene()
     blueMetal.baseColorTexture = ""; // No texture, use color only
     blueMetal.baseColorFactor = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f); // Blue
     blueMetal.emissiveFactor = glm::vec3(0.0f, 0.0f, 0.0f);
-    blueMetal.fogColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
     blueMetal.metallic = 1.0f; // Full metal
     blueMetal.roughness = 0.3f;
     instance3->setMaterial(blueMetal);

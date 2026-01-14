@@ -11,7 +11,12 @@
 class SceneManager
 {
 public:
-    SceneManager() : directionalLight(glm::vec4(glm::normalize(glm::vec3(0.5f, -0.8f, 0.3f)), 5.0f)), camera(std::make_shared<Camera>()) {}
+    SceneManager() 
+        : directionalLight(glm::vec4(glm::normalize(glm::vec3(0.5f, -0.8f, 0.3f)), 5.0f)), 
+          camera(std::make_shared<Camera>()),
+          fogColor(0.5f, 0.7f, 1.0f, 1.0f),  // Light blue fog
+          fogDensity(0.02f) 
+    {}
     ~SceneManager() = default;
 
     // Camera
@@ -25,6 +30,12 @@ public:
     const glm::vec4 &getDirectionalLight() const { return directionalLight; }
     void setDirectionalLightIntensity(float intensity) { directionalLight.w = intensity; }
     float getDirectionalLightIntensity() const { return directionalLight.w; }
+
+    // Fog
+    void setFogColor(const glm::vec4& color) { fogColor = color; }
+    const glm::vec4& getFogColor() const { return fogColor; }
+    void setFogDensity(float density) { fogDensity = density; }
+    float getFogDensity() const { return fogDensity; }
 
     // Add a new instance to the scene
     void addInstance(const std::shared_ptr<ModelInstance> &instance)
@@ -108,4 +119,6 @@ private:
     std::map<std::string, std::shared_ptr<Model>> models;
     glm::vec4 directionalLight; // xyz = direction, w = intensity
     std::shared_ptr<Camera> camera;
+    glm::vec4 fogColor;
+    float fogDensity;
 };

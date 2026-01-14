@@ -575,8 +575,8 @@ void VulkanRenderer::createGraphicsPipeline(const std::string& shaderName)
     dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
     dynamicState.pDynamicStates = dynamicStates.data();
 
-    // Push constants: mat4 model (64 bytes) + material data (60 bytes) = 124 bytes total
-    // Material data: vec4 baseColorFactor (16) + vec3 emissiveFactor (12+4 padding) + vec4 fogColor (16) + float metallic (4) + float roughness (4) = 56 bytes
+    // Push constants: mat4 model (64 bytes) + material data (44 bytes with padding) = 108 bytes total
+    // Material data: vec4 baseColorFactor (16) + vec3 emissiveFactor (12+4 padding) + float metallic (4) + float roughness (4) = 40 bytes
     VkPushConstantRange pushConstantRange{};
     pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;  // Both stages
     pushConstantRange.offset = 0;
@@ -1398,7 +1398,9 @@ void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
     renderPassInfo.renderArea.extent = swapChainExtent;
 
     std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    // Use scene fog color as clear color
+    glm::vec4 fogColor = sceneManager->getFogColor();
+    clearValues[0].color = {{fogColor.r, fogColor.g, fogColor.b, fogColor.a}};
     clearValues[1].depthStencil = {1.0f, 0};
 
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
@@ -1537,15 +1539,13 @@ void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
                     glm::vec4 baseColorFactor;        // 16 bytes (offset 64)
                     glm::vec3 emissiveFactor;         // 12 bytes (offset 80)
                     float _padding1;                  // 4 bytes padding
-                    glm::vec4 fogColor;               // 16 bytes (offset 96)
-                    float metallic;                   // 4 bytes (offset 112)
-                    float roughness;                  // 4 bytes (offset 116)
+                    float metallic;                   // 4 bytes (offset 96)
+                    float roughness;                  // 4 bytes (offset 100)
                 } pushData;
                 
                 pushData.model = instance->getModelMatrix();
                 pushData.baseColorFactor = material.baseColorFactor;
                 pushData.emissiveFactor = material.emissiveFactor;
-                pushData.fogColor = material.fogColor;
                 pushData.metallic = material.metallic;
                 pushData.roughness = material.roughness;
                 
@@ -1614,8 +1614,9 @@ void VulkanRenderer::updateUniformBuffer(uint32_t currentImage, std::shared_ptr<
     ubo.lightDir = glm::normalize(-glm::vec3(dirLight)); // Direction TO light
     ubo.lightColor = glm::vec3(dirLight.w * 2.0f); // Convert intensity to radiance
 
-    // Disable fog for now
-    ubo.fogDensity = 0.0f;
+    // Scene-wide fog
+    ubo.fogColor = sceneManager->getFogColor();
+    ubo.fogDensity = sceneManager->getFogDensity();
 
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }
