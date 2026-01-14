@@ -2,16 +2,15 @@
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
-    vec4 baseColor;
-    vec4 specularData; // rgb = specularColor, a = shininess
-    float useTexture;  // 1.0 = use texture, 0.0 = use base color
 } pc;
 
 layout(binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
-    vec4 directionalLight; // xyz = direction, w = intensity
     vec3 cameraPos;
+    vec3 lightDir;     // direction TO light (normalized)
+    vec3 lightColor;   // light radiance
+    float fogDensity;  // fog density factor
 } ubo;
 
 layout(location = 0) in vec3 inPosition;
@@ -19,27 +18,27 @@ layout(location = 1) in vec3 inColor;
 layout(location = 2) in vec2 inTexCoord;
 layout(location = 3) in vec3 inNormal;
 
-layout(location = 0) out vec3 fragColor;
-layout(location = 1) out vec2 fragTexCoord;
-layout(location = 2) out vec4 fragBaseColor;
-layout(location = 3) out vec3 fragNormal;
-layout(location = 4) out vec4 fragDirectionalLight;
-layout(location = 5) out vec3 fragWorldPos;
-layout(location = 6) out vec3 fragCameraPos;
-layout(location = 7) out vec4 fragSpecularData;
-layout(location = 8) out float fragUseTexture;
+layout(location = 0) out vec3 outNormal;      // world-space normal
+layout(location = 1) out vec2 outTexCoord;
+layout(location = 2) out vec3 outWorldPos;
+layout(location = 3) out vec3 outViewPos;     // camera position (world)
+layout(location = 4) out vec3 outLightDir;    // direction TO light (normalized)
+layout(location = 5) out vec3 outLightColor;  // radiance
+layout(location = 6) out float outFog;
 
 void main() {
     vec4 worldPos = pc.model * vec4(inPosition, 1.0);
     gl_Position = ubo.proj * ubo.view * worldPos;
-    fragColor = inColor;
-    fragTexCoord = inTexCoord;
-    fragBaseColor = pc.baseColor;
+
     // Transform normal to world space (assuming uniform scaling)
-    fragNormal = mat3(pc.model) * inNormal;
-    fragDirectionalLight = ubo.directionalLight;
-    fragWorldPos = worldPos.xyz;
-    fragCameraPos = ubo.cameraPos;
-    fragSpecularData = pc.specularData;
-    fragUseTexture = pc.useTexture;
+    outNormal = normalize(mat3(pc.model) * inNormal);
+    outTexCoord = inTexCoord;
+    outWorldPos = worldPos.xyz;
+    outViewPos = ubo.cameraPos;
+    outLightDir = ubo.lightDir;
+    outLightColor = ubo.lightColor;
+
+    // Simple fog based on distance
+    float distance = length(ubo.cameraPos - worldPos.xyz);
+    outFog = clamp(distance * ubo.fogDensity, 0.0, 1.0);
 }

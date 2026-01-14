@@ -52,9 +52,19 @@ struct UniformBufferObject
 {
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
-    alignas(16) glm::vec4 directionalLight; // xyz = direction, w = intensity
     alignas(16) glm::vec3 cameraPos;
-    alignas(4) float time; // Time in seconds for animations
+    alignas(16) glm::vec3 lightDir;     // direction TO light (normalized)
+    alignas(16) glm::vec3 lightColor;   // light radiance
+    alignas(4) float fogDensity;        // fog density factor
+};
+
+struct MaterialUniformBufferObject
+{
+    alignas(16) glm::vec4 baseColorFactor;    // base color multiplier
+    alignas(16) glm::vec3 emissiveFactor;     // emissive multiplier
+    alignas(16) glm::vec4 fogColor;           // fog color
+    alignas(4) float metallic;                // metallic factor (0.0 = dielectric, 1.0 = metal)
+    alignas(4) float roughness;               // roughness factor (0.0 = smooth, 1.0 = rough)
 };
 
 class VulkanRenderer
@@ -149,11 +159,23 @@ private:
     VkDeviceMemory textureImageMemory;
     VkImageView textureImageView;
     VkSampler textureSampler;
+
+    // Default white texture for materials without textures
+    VkImage defaultTextureImage;
+    VkDeviceMemory defaultTextureImageMemory;
+    VkImageView defaultTextureImageView;
+
+
     
     // Uniform buffers
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
+
+    // Material uniform buffers (for PBR material properties)
+    std::vector<VkBuffer> materialUniformBuffers;
+    std::vector<VkDeviceMemory> materialUniformBuffersMemory;
+    std::vector<void*> materialUniformBuffersMapped;
     
     // Descriptors
     VkDescriptorPool descriptorPool;
@@ -190,7 +212,9 @@ private:
     void createTextureImage();
     void createTextureImageView();
     void createTextureSampler();
+    void createDefaultTexture();
     void createUniformBuffers();
+    void createMaterialUniformBuffers();
     void createDescriptorPool();
     void createDescriptorSets();
     void createCommandBuffers();

@@ -46,26 +46,47 @@ void ExampleApplication::setupScene()
     sceneManager->setModel("cube", cubeModel);
 
     // Create multiple instances of the cube with different scales and positions
+    
+    // Left cube - Red metal
     auto instance1 = std::make_shared<ModelInstance>("cube", "instance_1");
     instance1->setPosition(glm::vec3(-1.5f, 0.0f, 0.0f));
-    instance1->setScale(glm::vec3(2.0f, 2.0f, 2.0f)); // Smaller scale, left
-    instance1->setMaterial(Material::metal(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f))); // Red metal
+    instance1->setScale(glm::vec3(2.0f, 2.0f, 2.0f));
+    Material redMetal;
+    redMetal.baseColorTexture = ""; // No texture, use color only
+    redMetal.baseColorFactor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
+    redMetal.emissiveFactor = glm::vec3(0.0f, 0.0f, 0.0f);
+    redMetal.fogColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    redMetal.metallic = 1.0f; // Full metal
+    redMetal.roughness = 0.3f;
+    instance1->setMaterial(redMetal);
     sceneManager->addInstance(instance1);
 
+    // Center cube - Textured
     auto instance2 = std::make_shared<ModelInstance>("cube", "instance_2");
     instance2->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-    instance2->setScale(glm::vec3(1.0f, 1.0f, 1.0f)); // Normal scale, center
-    // Use texture material
-    Material textureMat("shader", "textures/viking_room.png");
-    textureMat.specularColor = glm::vec3(0.1f, 0.1f, 0.1f);
-    textureMat.shininess = 32.0f;
-    instance2->setMaterial(textureMat);
+    instance2->setScale(glm::vec3(1.0f, 1.0f, 1.0f));
+    Material pbrMat;
+    pbrMat.baseColorTexture = "textures/viking_room.png";
+    pbrMat.baseColorFactor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    pbrMat.emissiveFactor = glm::vec3(0.0f, 0.0f, 0.0f);
+    pbrMat.fogColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    pbrMat.metallic = 0.0f; // Not metal, just textured
+    pbrMat.roughness = 0.5f;
+    instance2->setMaterial(pbrMat);
     sceneManager->addInstance(instance2);
 
+    // Right cube - Blue metal
     auto instance3 = std::make_shared<ModelInstance>("cube", "instance_3");
     instance3->setPosition(glm::vec3(1.5f, 0.0f, 0.0f));
-    instance3->setScale(glm::vec3(1.5f, 1.5f, 1.5f)); // Larger scale, right
-    instance3->setMaterial(Material::metal(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f))); // Blue metal
+    instance3->setScale(glm::vec3(1.5f, 1.5f, 1.5f));
+    Material blueMetal;
+    blueMetal.baseColorTexture = ""; // No texture, use color only
+    blueMetal.baseColorFactor = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f); // Blue
+    blueMetal.emissiveFactor = glm::vec3(0.0f, 0.0f, 0.0f);
+    blueMetal.fogColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    blueMetal.metallic = 1.0f; // Full metal
+    blueMetal.roughness = 0.3f;
+    instance3->setMaterial(blueMetal);
     sceneManager->addInstance(instance3);
 }
 

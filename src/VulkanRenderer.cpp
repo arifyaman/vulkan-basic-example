@@ -36,6 +36,9 @@ VulkanRenderer::VulkanRenderer(VkPhysicalDevice physicalDevice, VkDevice device,
     , textureImageMemory(VK_NULL_HANDLE)
     , textureImageView(VK_NULL_HANDLE)
     , textureSampler(VK_NULL_HANDLE)
+    , defaultTextureImage(VK_NULL_HANDLE)
+    , defaultTextureImageMemory(VK_NULL_HANDLE)
+    , defaultTextureImageView(VK_NULL_HANDLE)
     , descriptorPool(VK_NULL_HANDLE)
     , textureCache()
 {
@@ -58,9 +61,10 @@ void VulkanRenderer::initialize()
     createColorResources();
     createDepthResources();
     createFramebuffers();
-    // Note: Texture loading is now deferred until materials are known
     createTextureSampler();
+    createDefaultTexture();
     createUniformBuffers();
+    createMaterialUniformBuffers();
     createDescriptorPool();
     createDescriptorSets();
     createCommandBuffers();
@@ -86,15 +90,26 @@ void VulkanRenderer::cleanup()
         vkDestroyBuffer(device, uniformBuffers[i], nullptr);
         vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
     }
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        vkDestroyBuffer(device, materialUniformBuffers[i], nullptr);
+        vkFreeMemory(device, materialUniformBuffersMemory[i], nullptr);
+    }
     
     vkDestroyDescriptorPool(device, descriptorPool, nullptr);
     
     vkDestroySampler(device, textureSampler, nullptr);
     vkDestroyImageView(device, textureImageView, nullptr);
-    
+
     vkDestroyImage(device, textureImage, nullptr);
     vkFreeMemory(device, textureImageMemory, nullptr);
-    
+
+    // Destroy default texture
+    vkDestroyImageView(device, defaultTextureImageView, nullptr);
+    vkDestroyImage(device, defaultTextureImage, nullptr);
+    vkFreeMemory(device, defaultTextureImageMemory, nullptr);
+
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
     
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
@@ -384,21 +399,51 @@ void VulkanRenderer::createRenderPass()
 
 void VulkanRenderer::createDescriptorSetLayout()
 {
+    std::vector<VkDescriptorSetLayoutBinding> bindings;
+
+    // UBO binding (binding 0)
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
     uboLayoutBinding.binding = 0;
     uboLayoutBinding.descriptorCount = 1;
     uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uboLayoutBinding.pImmutableSamplers = nullptr;
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    bindings.push_back(uboLayoutBinding);
 
-    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-    samplerLayoutBinding.binding = 1;
-    samplerLayoutBinding.descriptorCount = 1;
-    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerLayoutBinding.pImmutableSamplers = nullptr;
-    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    // PBR Texture bindings (fragment shader bindings 0,1,2)
+    VkDescriptorSetLayoutBinding baseColorTexBinding{};
+    baseColorTexBinding.binding = 1;  // Fragment binding 0 -> Descriptor set binding 1
+    baseColorTexBinding.descriptorCount = 1;
+    baseColorTexBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    baseColorTexBinding.pImmutableSamplers = nullptr;
+    baseColorTexBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings.push_back(baseColorTexBinding);
 
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding, samplerLayoutBinding};
+    VkDescriptorSetLayoutBinding metallicRoughnessTexBinding{};
+    metallicRoughnessTexBinding.binding = 2;  // Fragment binding 1 -> Descriptor set binding 2
+    metallicRoughnessTexBinding.descriptorCount = 1;
+    metallicRoughnessTexBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    metallicRoughnessTexBinding.pImmutableSamplers = nullptr;
+    metallicRoughnessTexBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings.push_back(metallicRoughnessTexBinding);
+
+    VkDescriptorSetLayoutBinding emissiveTexBinding{};
+    emissiveTexBinding.binding = 3;  // Fragment binding 2 -> Descriptor set binding 3
+    emissiveTexBinding.descriptorCount = 1;
+    emissiveTexBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    emissiveTexBinding.pImmutableSamplers = nullptr;
+    emissiveTexBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings.push_back(emissiveTexBinding);
+
+    // Material uniform block binding (fragment shader binding 4)
+    VkDescriptorSetLayoutBinding materialBlockBinding{};
+    materialBlockBinding.binding = 4;
+    materialBlockBinding.descriptorCount = 1;
+    materialBlockBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    materialBlockBinding.pImmutableSamplers = nullptr;
+    materialBlockBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings.push_back(materialBlockBinding);
+
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -530,10 +575,12 @@ void VulkanRenderer::createGraphicsPipeline(const std::string& shaderName)
     dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
     dynamicState.pDynamicStates = dynamicStates.data();
 
+    // Push constants: mat4 model (64 bytes) + material data (60 bytes) = 124 bytes total
+    // Material data: vec4 baseColorFactor (16) + vec3 emissiveFactor (12+4 padding) + vec4 fogColor (16) + float metallic (4) + float roughness (4) = 56 bytes
     VkPushConstantRange pushConstantRange{};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;  // Both stages
     pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(glm::mat4) + sizeof(glm::vec4) + sizeof(glm::vec4) + sizeof(float); // mat4 + baseColor + specularData + useTexture
+    pushConstantRange.size = 128;  // 64 bytes for model matrix + 64 bytes for material data (with padding)
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -797,6 +844,8 @@ void VulkanRenderer::createTextureImageView()
     textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
 }
 
+
+
 void VulkanRenderer::createTextureSampler()
 {
     VkPhysicalDeviceProperties properties{};
@@ -824,6 +873,35 @@ void VulkanRenderer::createTextureSampler()
     {
         throw std::runtime_error("failed to create texture sampler!");
     }
+}
+
+void VulkanRenderer::createDefaultTexture()
+{
+    // Create a simple 1x1 white texture for materials without textures
+    VkDeviceSize imageSize = 4; // 1x1 RGBA pixel = 4 bytes
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+    // White pixel data (RGBA: 255, 255, 255, 255)
+    uint32_t whitePixel = 0xFFFFFFFF;
+    void* data;
+    vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
+    memcpy(data, &whitePixel, static_cast<size_t>(imageSize));
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    createImage(1, 1, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, defaultTextureImage, defaultTextureImageMemory);
+
+    transitionImageLayout(defaultTextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1);
+    copyBufferToImage(stagingBuffer, defaultTextureImage, 1, 1);
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+    transitionImageLayout(defaultTextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
+
+    defaultTextureImageView = createImageView(defaultTextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 }
 
 void VulkanRenderer::loadTexture(const std::string& texturePath)
@@ -883,15 +961,41 @@ void VulkanRenderer::loadRequiredTextures(std::shared_ptr<SceneManager> sceneMan
         if (instance)
         {
             const Material& material = instance->getMaterial();
-            if (material.hasDiffuseTexture())
+
+            // Load PBR textures
+            if (!material.baseColorTexture.empty())
             {
                 try
                 {
-                    loadTexture(material.diffuseTexture);
+                    loadTexture(material.baseColorTexture);
                 }
                 catch (const std::exception& e)
                 {
-                    std::cerr << "Warning: Failed to load texture '" << material.diffuseTexture << "': " << e.what() << std::endl;
+                    std::cerr << "Warning: Failed to load base color texture '" << material.baseColorTexture << "': " << e.what() << std::endl;
+                }
+            }
+
+            if (!material.metallicRoughnessTexture.empty())
+            {
+                try
+                {
+                    loadTexture(material.metallicRoughnessTexture);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Warning: Failed to load metallic/roughness texture '" << material.metallicRoughnessTexture << "': " << e.what() << std::endl;
+                }
+            }
+
+            if (!material.emissiveTexture.empty())
+            {
+                try
+                {
+                    loadTexture(material.emissiveTexture);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Warning: Failed to load emissive texture '" << material.emissiveTexture << "': " << e.what() << std::endl;
                 }
             }
         }
@@ -1049,13 +1153,29 @@ void VulkanRenderer::createUniformBuffers()
     }
 }
 
+void VulkanRenderer::createMaterialUniformBuffers()
+{
+    VkDeviceSize bufferSize = sizeof(MaterialUniformBufferObject);
+
+    materialUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    materialUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+    materialUniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, materialUniformBuffers[i], materialUniformBuffersMemory[i]);
+
+        vkMapMemory(device, materialUniformBuffersMemory[i], 0, bufferSize, 0, &materialUniformBuffersMapped[i]);
+    }
+}
+
 void VulkanRenderer::createDescriptorPool()
 {
     std::array<VkDescriptorPoolSize, 2> poolSizes{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 4); // UBO + 3 material uniforms
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 3); // 3 PBR textures
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1086,26 +1206,33 @@ void VulkanRenderer::createDescriptorSets()
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = uniformBuffers[i];
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(UniformBufferObject);
+        VkDescriptorBufferInfo uboBufferInfo{};
+        uboBufferInfo.buffer = uniformBuffers[i];
+        uboBufferInfo.offset = 0;
+        uboBufferInfo.range = sizeof(UniformBufferObject);
+
+        VkDescriptorBufferInfo materialBufferInfo{};
+        materialBufferInfo.buffer = materialUniformBuffers[i];
+        materialBufferInfo.offset = 0;
+        materialBufferInfo.range = sizeof(MaterialUniformBufferObject);
 
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = textureImageView;
+        imageInfo.imageView = defaultTextureImageView; // Use default white texture
         imageInfo.sampler = textureSampler;
 
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+        std::array<VkWriteDescriptorSet, 5> descriptorWrites{};
 
+        // UBO binding (binding 0)
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = descriptorSets[i];
         descriptorWrites[0].dstBinding = 0;
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = &bufferInfo;
+        descriptorWrites[0].pBufferInfo = &uboBufferInfo;
 
+        // Base color texture binding (binding 1)
         descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[1].dstSet = descriptorSets[i];
         descriptorWrites[1].dstBinding = 1;
@@ -1113,6 +1240,33 @@ void VulkanRenderer::createDescriptorSets()
         descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrites[1].descriptorCount = 1;
         descriptorWrites[1].pImageInfo = &imageInfo;
+
+        // Metallic/roughness texture binding (binding 2) - use default texture
+        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[2].dstSet = descriptorSets[i];
+        descriptorWrites[2].dstBinding = 2;
+        descriptorWrites[2].dstArrayElement = 0;
+        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[2].descriptorCount = 1;
+        descriptorWrites[2].pImageInfo = &imageInfo;
+
+        // Emissive texture binding (binding 3) - use default texture
+        descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[3].dstSet = descriptorSets[i];
+        descriptorWrites[3].dstBinding = 3;
+        descriptorWrites[3].dstArrayElement = 0;
+        descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[3].descriptorCount = 1;
+        descriptorWrites[3].pImageInfo = &imageInfo;
+
+        // Material uniform block binding (binding 4)
+        descriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[4].dstSet = descriptorSets[i];
+        descriptorWrites[4].dstBinding = 4;
+        descriptorWrites[4].dstArrayElement = 0;
+        descriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[4].descriptorCount = 1;
+        descriptorWrites[4].pBufferInfo = &materialBufferInfo;
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
@@ -1281,45 +1435,58 @@ void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
             if (model && model->hasBuffers())
             {
                 const Material &material = instance->getMaterial();
-                
-                // Switch pipeline if needed
-                if (currentPipeline != material.shaderName)
+
+                // Bind the PBR pipeline (only one shader now)
+                if (currentPipeline != "shader")
                 {
-                    currentPipeline = material.shaderName;
-                    auto pipelineIt = graphicsPipelines.find(currentPipeline);
-                    if (pipelineIt != graphicsPipelines.end())
+                    currentPipeline = "shader";
+                    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines["shader"]);
+                }
+                
+                // For PBR, we bind textures dynamically per material
+                // Always set base color texture - use specific texture or default white
+                VkDescriptorImageInfo baseColorImageInfo{};
+                baseColorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                baseColorImageInfo.sampler = textureSampler;
+
+                if (!material.baseColorTexture.empty())
+                {
+                    // Use specific texture for this material
+                    auto textureIt = textureCache.find(material.baseColorTexture);
+                    if (textureIt != textureCache.end())
                     {
-                        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineIt->second);
+                        baseColorImageInfo.imageView = textureIt->second.view;
                     }
                     else
                     {
-                        // Fallback to default shader
-                        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines["shader"]);
+                        // Fallback to default white texture if texture not found
+                        baseColorImageInfo.imageView = defaultTextureImageView;
                     }
                 }
-                
-                // Get the model matrix for this instance
-                glm::mat4 modelMatrix = instance->getModelMatrix();
-                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
-
-                // Push material properties (base color always first)
-                uint32_t offset = sizeof(glm::mat4);
-                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, offset, sizeof(glm::vec4), &material.baseColor);
-                offset += sizeof(glm::vec4);
-
-                // Push specular data
-                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, offset, sizeof(glm::vec4), &material.specularColor);
-                offset += sizeof(glm::vec4);
-
-                // Push use texture flag
-                float useTexture = material.hasDiffuseTexture() ? 1.0f : 0.0f;
-                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, offset, sizeof(float), &useTexture);
-                offset += sizeof(float);
-
-                // Bind texture if material has one
-                if (material.hasDiffuseTexture())
+                else
                 {
-                    auto textureIt = textureCache.find(material.diffuseTexture);
+                    // Use default white texture for materials without textures
+                    baseColorImageInfo.imageView = defaultTextureImageView;
+                }
+
+                VkWriteDescriptorSet baseColorDescriptorWrite{};
+                baseColorDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                baseColorDescriptorWrite.dstSet = descriptorSets[currentFrame];
+                baseColorDescriptorWrite.dstBinding = 1; // Descriptor set binding 1
+                baseColorDescriptorWrite.dstArrayElement = 0;
+                baseColorDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                baseColorDescriptorWrite.descriptorCount = 1;
+                baseColorDescriptorWrite.pImageInfo = &baseColorImageInfo;
+
+                vkUpdateDescriptorSets(device, 1, &baseColorDescriptorWrite, 0, nullptr);
+
+                // Re-bind the descriptor set after updating textures
+                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+
+                // Bind metallic/roughness texture (descriptor set binding 2, fragment binding 1)
+                if (!material.metallicRoughnessTexture.empty())
+                {
+                    auto textureIt = textureCache.find(material.metallicRoughnessTexture);
                     if (textureIt != textureCache.end())
                     {
                         VkDescriptorImageInfo imageInfo{};
@@ -1330,7 +1497,7 @@ void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
                         VkWriteDescriptorSet descriptorWrite{};
                         descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                         descriptorWrite.dstSet = descriptorSets[currentFrame];
-                        descriptorWrite.dstBinding = 1;
+                        descriptorWrite.dstBinding = 2; // Descriptor set binding 2
                         descriptorWrite.dstArrayElement = 0;
                         descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                         descriptorWrite.descriptorCount = 1;
@@ -1340,23 +1507,51 @@ void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
                     }
                 }
 
-                // Push dynamic shader parameters
-                const ShaderParameterSet& shaderParams = material.getShaderParams();
-                for (const auto& param : shaderParams.getAll())
+                // Bind emissive texture (descriptor set binding 3, fragment binding 2)
+                if (!material.emissiveTexture.empty())
                 {
-                    if (param.getType() != ShaderParameterType::Texture)
+                    auto textureIt = textureCache.find(material.emissiveTexture);
+                    if (textureIt != textureCache.end())
                     {
-                        uint32_t paramSize = static_cast<uint32_t>(param.getPushConstantSize());
+                        VkDescriptorImageInfo imageInfo{};
+                        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                        imageInfo.imageView = textureIt->second.view;
+                        imageInfo.sampler = textureSampler;
 
-                        // Create a temporary buffer for the parameter data
-                        alignas(16) uint8_t buffer[16]; // Max size for vec4
-                        param.writeToPushConstant(buffer);
+                        VkWriteDescriptorSet descriptorWrite{};
+                        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                        descriptorWrite.dstSet = descriptorSets[currentFrame];
+                        descriptorWrite.dstBinding = 3; // Descriptor set binding 3
+                        descriptorWrite.dstArrayElement = 0;
+                        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                        descriptorWrite.descriptorCount = 1;
+                        descriptorWrite.pImageInfo = &imageInfo;
 
-                        vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-                                         offset, paramSize, buffer);
-                        offset += paramSize;
+                        vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
                     }
                 }
+
+                // Send model matrix and material data via push constants
+                struct PushConstantData {
+                    glm::mat4 model;                  // 64 bytes (offset 0)
+                    glm::vec4 baseColorFactor;        // 16 bytes (offset 64)
+                    glm::vec3 emissiveFactor;         // 12 bytes (offset 80)
+                    float _padding1;                  // 4 bytes padding
+                    glm::vec4 fogColor;               // 16 bytes (offset 96)
+                    float metallic;                   // 4 bytes (offset 112)
+                    float roughness;                  // 4 bytes (offset 116)
+                } pushData;
+                
+                pushData.model = instance->getModelMatrix();
+                pushData.baseColorFactor = material.baseColorFactor;
+                pushData.emissiveFactor = material.emissiveFactor;
+                pushData.fogColor = material.fogColor;
+                pushData.metallic = material.metallic;
+                pushData.roughness = material.roughness;
+                
+                vkCmdPushConstants(commandBuffer, pipelineLayout, 
+                                 VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 
+                                 0, sizeof(pushData), &pushData);
 
                 // Bind the model's vertex and index buffers
                 VkBuffer vertexBuffers[] = {model->getVertexBuffer()};
@@ -1405,16 +1600,22 @@ void VulkanRenderer::createSyncObjects()
 void VulkanRenderer::updateUniformBuffer(uint32_t currentImage, std::shared_ptr<SceneManager> sceneManager)
 {
     auto camera = sceneManager->getCamera();
-    
+
     // Update camera aspect ratio
     camera->setAspectRatio(swapChainExtent.width / (float)swapChainExtent.height);
-    
+
     UniformBufferObject ubo{};
     ubo.view = camera->getViewMatrix();
     ubo.proj = camera->getProjectionMatrix();
-    ubo.directionalLight = sceneManager->getDirectionalLight();
     ubo.cameraPos = camera->getPosition();
-    ubo.time = static_cast<float>(glfwGetTime() - startTime);
+
+    // Convert directional light (xyz = direction, w = intensity) to PBR format
+    glm::vec4 dirLight = sceneManager->getDirectionalLight();
+    ubo.lightDir = glm::normalize(-glm::vec3(dirLight)); // Direction TO light
+    ubo.lightColor = glm::vec3(dirLight.w * 2.0f); // Convert intensity to radiance
+
+    // Disable fog for now
+    ubo.fogDensity = 0.0f;
 
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }

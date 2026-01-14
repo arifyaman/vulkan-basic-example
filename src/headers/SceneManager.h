@@ -11,7 +11,7 @@
 class SceneManager
 {
 public:
-    SceneManager() : directionalLight(glm::vec4(glm::normalize(glm::vec3(0.5f, -0.8f, 0.3f)), 1.0f)), camera(std::make_shared<Camera>()) {}
+    SceneManager() : directionalLight(glm::vec4(glm::normalize(glm::vec3(0.5f, -0.8f, 0.3f)), 5.0f)), camera(std::make_shared<Camera>()) {}
     ~SceneManager() = default;
 
     // Camera
