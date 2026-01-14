@@ -23,7 +23,7 @@ void ExampleApplication::initVulkan()
     renderer->initialize();
 
     // Load shaders needed by this application
-    renderer->createGraphicsPipelines({"shader", "custom"});
+    renderer->createGraphicsPipelines({"shader"});
 
     setupScene();
 
