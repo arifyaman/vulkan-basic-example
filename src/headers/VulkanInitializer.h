@@ -30,9 +30,19 @@
 const std::vector<const char *> validationLayers = {
     "VK_LAYER_KHRONOS_validation"};
 
+// Additional debug layers that might be available
+const std::vector<const char *> additionalDebugLayers = {
+    "VK_LAYER_LUNARG_monitor",           // FPS monitor
+    "VK_LAYER_LUNARG_api_dump",          // API call logging
+    "VK_LAYER_LUNARG_device_simulation", // Device simulation for testing
+    "VK_LAYER_KHRONOS_synchronization2", // Enhanced synchronization validation
+};
+
 const std::vector<const char *> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME};
+    VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+    VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
+    VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME};
 
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
@@ -84,10 +94,8 @@ private:
     void createLogicalDevice();
 
     // Helper methods
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
     bool isDeviceSuitable(VkPhysicalDevice device);
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
     VkSampleCountFlagBits getMaxUsableSampleCount();
     std::vector<const char *> getRequiredExtensions();
     bool checkValidationLayerSupport();

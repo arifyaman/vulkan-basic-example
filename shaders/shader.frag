@@ -1,6 +1,23 @@
 // Vulkan GLSL Fragment Shader — Forward PBR (metallic/roughness)
 #version 450
 
+struct IndirectInstanceData
+{
+    mat4 modelMatrix;
+    vec4 baseColorFactor;
+    vec3 emissiveFactor;
+    float metallic;
+    float roughness;
+    uint baseColorTextureIndex;
+    uint metallicRoughnessTextureIndex;
+    uint emissiveTextureIndex;
+    uint vertexBufferIndex;
+    uint indexBufferIndex;
+    uint firstIndex;
+    uint indexCount;
+    uint vertexOffset;
+};
+
 layout(location = 0) in vec3 inNormal;      // world-space normal
 layout(location = 1) in vec2 inTexCoord;
 layout(location = 2) in vec3 inWorldPos;
@@ -9,6 +26,7 @@ layout(location = 4) in vec3 inLightDir;    // direction TO light (normalized)
 layout(location = 5) in vec3 inLightColor;  // radiance
 layout(location = 6) in float inFog;
 layout(location = 7) in vec4 inFogColor;    // scene fog color
+layout(location = 8) in flat uint inInstanceIndex; // instance index for indirect rendering
 
 layout(location = 0) out vec4 outFragColor;
 
@@ -18,13 +36,9 @@ layout(set = 0, binding = 1) uniform sampler2D u_baseColorTex;
 layout(set = 0, binding = 2) uniform sampler2D u_metallicRoughnessTex; // B=metallic, G=roughness
 layout(set = 0, binding = 3) uniform sampler2D u_emissiveTex;
 
-// Use push constant for material properties instead of uniform buffer
-layout(push_constant) uniform PushConstants {
-    layout(offset = 64) vec4 baseColorFactor;  // offset after mat4 model matrix
-    layout(offset = 80) vec3 emissiveFactor;
-    layout(offset = 96) float metallic;
-    layout(offset = 100) float roughness;
-} pc;
+layout(binding = 5) readonly buffer InstanceBuffer {
+    IndirectInstanceData instances[];
+} instanceBuffer;
 
 const float PI = 3.14159265359;
 
@@ -64,15 +78,17 @@ vec3 FresnelSchlick(float cosTheta, vec3 F0)
 
 void main()
 {
+    IndirectInstanceData instance = instanceBuffer.instances[inInstanceIndex];
+
     // ─────────────────────────────────────────
     // Material inputs
-    vec4 baseColor = texture(u_baseColorTex, inTexCoord) * pc.baseColorFactor;
+    vec4 baseColor = texture(u_baseColorTex, inTexCoord) * instance.baseColorFactor;
 
-    // Use material properties from push constants
-    float metallic = pc.metallic;
-    float roughness = clamp(pc.roughness, 0.04, 1.0);
+    // Use material properties from instance data
+    float metallic = instance.metallic;
+    float roughness = clamp(instance.roughness, 0.04, 1.0);
 
-    vec3 emissive = texture(u_emissiveTex, inTexCoord).rgb * pc.emissiveFactor;
+    vec3 emissive = texture(u_emissiveTex, inTexCoord).rgb * instance.emissiveFactor;
 
     // ─────────────────────────────────────────
     // Lighting vectors

@@ -7,47 +7,22 @@
 #include <vector>
 #include <memory>
 #include <array>
-#include <optional>
-#include <unordered_map>
 
 #include "Model.h"
 #include "SceneManager.h"
 #include "ShaderParameter.h"
 
+// Forward declarations
+class VulkanSwapChain;
+class VulkanTexture;
+class VulkanBuffer;
+class VulkanPipeline;
+class VulkanCommandManager;
+class VulkanDescriptorManager;
+
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
-// Forward declarations and shared structures
-struct QueueFamilyIndices;
-struct SwapChainSupportDetails;
-struct UniformBufferObject;
-
-// Texture resource structure
-struct TextureResource {
-    VkImage image;
-    VkDeviceMemory memory;
-    VkImageView view;
-    uint32_t mipLevels;
-};
-
 // Shared structures
-struct QueueFamilyIndices
-{
-    std::optional<uint32_t> graphicsFamily;
-    std::optional<uint32_t> presentFamily;
-
-    bool isComplete()
-    {
-        return graphicsFamily.has_value() && presentFamily.has_value();
-    }
-};
-
-struct SwapChainSupportDetails
-{
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> formats;
-    std::vector<VkPresentModeKHR> presentModes;
-};
-
 struct UniformBufferObject
 {
     alignas(16) glm::mat4 view;
@@ -57,15 +32,33 @@ struct UniformBufferObject
     alignas(16) glm::vec3 lightColor;   // light radiance
     alignas(16) glm::vec4 fogColor;     // fog color (scene-wide)
     alignas(4) float fogDensity;        // fog density factor
+    alignas(4) float fogStart;          // minimum distance before fog starts
 };
 
 struct MaterialUniformBufferObject
 {
     alignas(16) glm::vec4 baseColorFactor;    // base color multiplier
     alignas(16) glm::vec3 emissiveFactor;     // emissive multiplier
-    alignas(16) glm::vec4 fogColor;           // fog color
     alignas(4) float metallic;                // metallic factor (0.0 = dielectric, 1.0 = metal)
     alignas(4) float roughness;               // roughness factor (0.0 = smooth, 1.0 = rough)
+};
+
+// Indirect rendering structures
+struct IndirectInstanceData
+{
+    glm::mat4 modelMatrix;           // Model transformation matrix
+    glm::vec4 baseColorFactor;       // Material base color
+    glm::vec3 emissiveFactor;        // Material emissive factor
+    float metallic;                  // Material metallic value
+    float roughness;                 // Material roughness value
+    uint32_t baseColorTextureIndex;  // Index into texture array (0 = default white)
+    uint32_t metallicRoughnessTextureIndex; // Index into texture array (0 = default)
+    uint32_t emissiveTextureIndex;   // Index into texture array (0 = default)
+    uint32_t vertexBufferIndex;      // Index of vertex buffer to use
+    uint32_t indexBufferIndex;       // Index of index buffer to use
+    uint32_t firstIndex;             // First index in index buffer
+    uint32_t indexCount;             // Number of indices to draw
+    uint32_t vertexOffset;           // Vertex offset in vertex buffer
 };
 
 class VulkanRenderer
@@ -88,33 +81,23 @@ public:
     
     // Swap chain management
     void recreateSwapChain();
-    void cleanupSwapChain();
     
     // Getters
-    VkCommandPool getCommandPool() const { return commandPool; }
     bool wasFramebufferResized() const { return framebufferResized; }
     void setFramebufferResized(bool resized) { framebufferResized = resized; }
     
-    // Resource creation helpers (for use by Model class and others)
+    // Texture management
+    void loadTexture(const std::string& texturePath);
+    void loadRequiredTextures(std::shared_ptr<SceneManager> sceneManager);
+
+    // Helper functions for Model class
+    VkCommandPool getCommandPool() const;
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, 
                      VkBuffer& buffer, VkDeviceMemory& bufferMemory);
     VkCommandBuffer beginSingleTimeCommands();
     void endSingleTimeCommands(VkCommandBuffer commandBuffer);
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-    
-    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels);
-    void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples,
-                    VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, 
-                    VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
-    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
-                             VkImageLayout newLayout, uint32_t mipLevels);
-    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-    void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
-
-    // Texture management
-    void loadTexture(const std::string& texturePath);
-    void loadRequiredTextures(std::shared_ptr<SceneManager> sceneManager);
 
 private:
     // Vulkan handles (not owned by renderer)
@@ -126,60 +109,43 @@ private:
     GLFWwindow* window;
     VkSampleCountFlagBits msaaSamples;
     
-    // Swap chain
-    VkSwapchainKHR swapChain;
-    std::vector<VkImage> swapChainImages;
-    VkFormat swapChainImageFormat;
-    VkExtent2D swapChainExtent;
-    std::vector<VkImageView> swapChainImageViews;
+    // Helper classes
+    std::shared_ptr<VulkanSwapChain> swapChain;
+    std::shared_ptr<VulkanTexture> textureManager;
+    std::shared_ptr<VulkanBuffer> bufferManager;
+    std::shared_ptr<VulkanPipeline> pipelineManager;
+    std::shared_ptr<VulkanCommandManager> commandManager;
+    std::shared_ptr<VulkanDescriptorManager> descriptorManager;
 
-    // Pipeline
-    VkDescriptorSetLayout descriptorSetLayout;
-    VkPipelineLayout pipelineLayout;
-    std::unordered_map<std::string, VkPipeline> graphicsPipelines; // Multiple pipelines by shader name
+    // MSAA resources
+    VkImage colorImage = VK_NULL_HANDLE;
+    VkDeviceMemory colorImageMemory = VK_NULL_HANDLE;
+    VkImageView colorImageView = VK_NULL_HANDLE;
     
-    // Command buffers
-    VkCommandPool commandPool;
-    std::vector<VkCommandBuffer> commandBuffers;
-    
-    // MSAA
-    VkImage colorImage;
-    VkDeviceMemory colorImageMemory;
-    VkImageView colorImageView;
-    
-    // Depth
-    VkImage depthImage;
-    VkDeviceMemory depthImageMemory;
-    VkImageView depthImageView;
-    
-    // Texture
-    uint32_t mipLevels;
-    VkImage textureImage;
-    VkDeviceMemory textureImageMemory;
-    VkImageView textureImageView;
-    VkSampler textureSampler;
-
-    // Default white texture for materials without textures
-    VkImage defaultTextureImage;
-    VkDeviceMemory defaultTextureImageMemory;
-    VkImageView defaultTextureImageView;
-
-
+    // Depth resources
+    VkImage depthImage = VK_NULL_HANDLE;
+    VkDeviceMemory depthImageMemory = VK_NULL_HANDLE;
+    VkImageView depthImageView = VK_NULL_HANDLE;
     
     // Uniform buffers
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
 
-    // Material uniform buffers (for PBR material properties)
+    // Material uniform buffers
     std::vector<VkBuffer> materialUniformBuffers;
     std::vector<VkDeviceMemory> materialUniformBuffersMemory;
     std::vector<void*> materialUniformBuffersMapped;
     
-    // Descriptors
-    VkDescriptorPool descriptorPool;
-    std::vector<VkDescriptorSet> descriptorSets;
-    
+    // Indirect rendering resources
+    std::vector<VkBuffer> indirectCommandBuffers;
+    std::vector<VkDeviceMemory> indirectCommandBuffersMemory;
+    std::vector<void*> indirectCommandBuffersMapped;
+    std::vector<VkBuffer> indirectInstanceBuffers;
+    std::vector<VkDeviceMemory> indirectInstanceBuffersMemory;
+    std::vector<void*> indirectInstanceBuffersMapped;
+    std::vector<uint32_t> indirectDrawCounts;
+
     // Synchronization
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
@@ -188,52 +154,25 @@ private:
 
     bool framebufferResized = false;
 
-    // Texture cache for dynamic texture loading
-    std::unordered_map<std::string, TextureResource> textureCache;
-    
     // FPS tracking
     double lastTime = 0.0;
     int frameCount = 0;
     double fps = 0.0;
-    double startTime = 0.0; // Application start time for animations
+    double startTime = 0.0;
     
     // Internal methods
-    void createSwapChain();
-    void createImageViews();
-    void createRenderPass();
-    void createDescriptorSetLayout();
-    void createGraphicsPipeline();
-    void createGraphicsPipeline(const std::string& shaderName); // Create pipeline for specific shader
-    void createFramebuffers();
-    void createCommandPool();
     void createColorResources();
     void createDepthResources();
-    void createTextureImage();
-    void createTextureImageView();
-    void createTextureSampler();
-    void createDefaultTexture();
+    void cleanupSwapChainResources();
     void createUniformBuffers();
     void createMaterialUniformBuffers();
-    void createDescriptorPool();
-    void createDescriptorSets();
-    void createCommandBuffers();
+    void createIndirectBuffers();
     void createSyncObjects();
     
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex,
                            std::shared_ptr<SceneManager> sceneManager);
     void updateUniformBuffer(uint32_t currentImage, std::shared_ptr<SceneManager> sceneManager);
     
-    VkShaderModule createShaderModule(const std::vector<char>& code);
-    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
-    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-    
-    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
     VkFormat findDepthFormat();
-    bool hasStencilComponent(VkFormat format);
-    
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
-    
-    static std::vector<char> readFile(const std::string& filename);
+    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 };

@@ -1,8 +1,21 @@
 #version 450
 
-layout(push_constant) uniform PushConstants {
-    mat4 model;
-} pc;
+struct IndirectInstanceData
+{
+    mat4 modelMatrix;
+    vec4 baseColorFactor;
+    vec3 emissiveFactor;
+    float metallic;
+    float roughness;
+    uint baseColorTextureIndex;
+    uint metallicRoughnessTextureIndex;
+    uint emissiveTextureIndex;
+    uint vertexBufferIndex;
+    uint indexBufferIndex;
+    uint firstIndex;
+    uint indexCount;
+    uint vertexOffset;
+};
 
 layout(binding = 0) uniform UniformBufferObject {
     mat4 view;
@@ -12,7 +25,12 @@ layout(binding = 0) uniform UniformBufferObject {
     vec3 lightColor;   // light radiance
     vec4 fogColor;     // scene-wide fog color
     float fogDensity;  // fog density factor
+    float fogStart;    // minimum distance before fog starts
 } ubo;
+
+layout(binding = 5) readonly buffer InstanceBuffer {
+    IndirectInstanceData instances[];
+} instanceBuffer;
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inColor;
@@ -27,13 +45,16 @@ layout(location = 4) out vec3 outLightDir;    // direction TO light (normalized)
 layout(location = 5) out vec3 outLightColor;  // radiance
 layout(location = 6) out float outFog;
 layout(location = 7) out vec4 outFogColor;    // scene fog color
+layout(location = 8) out flat uint outInstanceIndex; // instance index for indirect rendering
 
 void main() {
-    vec4 worldPos = pc.model * vec4(inPosition, 1.0);
+    IndirectInstanceData instance = instanceBuffer.instances[gl_InstanceIndex];
+
+    vec4 worldPos = instance.modelMatrix * vec4(inPosition, 1.0);
     gl_Position = ubo.proj * ubo.view * worldPos;
 
     // Transform normal to world space (assuming uniform scaling)
-    outNormal = normalize(mat3(pc.model) * inNormal);
+    outNormal = normalize(mat3(instance.modelMatrix) * inNormal);
     outTexCoord = inTexCoord;
     outWorldPos = worldPos.xyz;
     outViewPos = ubo.cameraPos;
@@ -41,7 +62,11 @@ void main() {
     outLightColor = ubo.lightColor;
     outFogColor = ubo.fogColor;
 
-    // Simple fog based on distance
+    // Exponential fog with minimum distance
     float distance = length(ubo.cameraPos - worldPos.xyz);
-    outFog = clamp(distance * ubo.fogDensity, 0.0, 1.0);
+    float fogDistance = max(distance - ubo.fogStart, 0.0);
+    outFog = 1.0 - exp(-fogDistance * ubo.fogDensity);
+
+    // Pass instance index to fragment shader
+    outInstanceIndex = gl_InstanceIndex;
 }

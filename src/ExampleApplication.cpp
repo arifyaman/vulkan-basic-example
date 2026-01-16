@@ -33,17 +33,25 @@ void ExampleApplication::initVulkan()
 
 void ExampleApplication::setupScene()
 {
-    // Get command pool from renderer
-    VkCommandPool commandPool = renderer->getCommandPool();
+    std::cout << "Setting up scene..." << std::endl;
 
-    // Create box model (using default 1x1x1 cube)
-    auto cubeModel = std::shared_ptr<Model>(Model::createBox(
-        vulkanInitializer->getDevice(),
-        vulkanInitializer->getPhysicalDevice(),
-        commandPool,
-        vulkanInitializer->getGraphicsQueue()
-    ));
-    sceneManager->setModel("cube", cubeModel);
+    try {
+        // Get command pool from renderer
+        VkCommandPool commandPool = renderer->getCommandPool();
+        std::cout << "Got command pool" << std::endl;
+
+        // Create box model (using default 1x1x1 cube)
+        std::cout << "Creating cube model..." << std::endl;
+        auto cubeModel = std::shared_ptr<Model>(Model::createBox(
+            vulkanInitializer->getDevice(),
+            vulkanInitializer->getPhysicalDevice(),
+            commandPool,
+            vulkanInitializer->getGraphicsQueue()
+        ));
+        std::cout << "Cube model created successfully" << std::endl;
+
+        sceneManager->setModel("cube", cubeModel);
+        std::cout << "Model added to scene manager" << std::endl;
 
     // Create multiple instances of the cube with different scales and positions
     
@@ -84,28 +92,43 @@ void ExampleApplication::setupScene()
     blueMetal.metallic = 1.0f; // Full metal
     blueMetal.roughness = 0.3f;
     instance3->setMaterial(blueMetal);
-    sceneManager->addInstance(instance3);
+        sceneManager->addInstance(instance3);
+
+        std::cout << "Scene setup complete!" << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "ERROR during scene setup: " << e.what() << std::endl;
+        throw;
+    }
 }
 
 void ExampleApplication::mainLoop()
 {
-    auto lastTime = std::chrono::high_resolution_clock::now();
+    std::cout << "Starting main loop..." << std::endl;
 
-    while (!glfwWindowShouldClose(window))
-    {
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - lastTime).count();
-        lastTime = currentTime;
+    try {
+        auto lastTime = std::chrono::high_resolution_clock::now();
 
-        glfwPollEvents();
-        updateRotation(deltaTime);
+        while (!glfwWindowShouldClose(window))
+        {
+            auto currentTime = std::chrono::high_resolution_clock::now();
+            float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - lastTime).count();
+            lastTime = currentTime;
 
-        // Update the rotation of the first instance
-        if (auto instance = sceneManager->getInstance(0)) {
-            instance->setRotation(currentRotation);
+            glfwPollEvents();
+            updateRotation(deltaTime);
+
+            // Update the rotation of the first instance
+            if (auto instance = sceneManager->getInstance(0)) {
+                instance->setRotation(currentRotation);
+            }
+
+            renderer->drawFrame(sceneManager);
         }
 
-        renderer->drawFrame(sceneManager);
+        std::cout << "Main loop ended normally" << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "ERROR in main loop: " << e.what() << std::endl;
+        throw;
     }
 
     vkDeviceWaitIdle(vulkanInitializer->getDevice());

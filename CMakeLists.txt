@@ -27,6 +27,12 @@ set(SOURCES
     src/VulkanInitializer.cpp
     src/ExampleApplication.cpp
     src/VulkanRenderer.cpp
+    src/VulkanSwapChain.cpp
+    src/VulkanTexture.cpp
+    src/VulkanBuffer.cpp
+    src/VulkanPipeline.cpp
+    src/VulkanCommandManager.cpp
+    src/VulkanDescriptorManager.cpp
 )
 
 set(HEADERS
@@ -38,6 +44,13 @@ set(HEADERS
     src/headers/SceneManager.h
     src/headers/VulkanInitializer.h
     src/headers/VulkanRenderer.h
+    src/headers/VulkanSwapChain.h
+    src/headers/VulkanTexture.h
+    src/headers/VulkanBuffer.h
+    src/headers/VulkanPipeline.h
+    src/headers/VulkanCommandManager.h
+    src/headers/VulkanDescriptorManager.h
+    src/headers/ShaderParameter.h
 )
 
 # Create executable
@@ -78,10 +91,11 @@ if(WIN32)
         set_target_properties(vulkan_app PROPERTIES
             VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         )
-        
-        # Set subsystem to Windows (no console)
-        target_link_options(vulkan_app PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
-        
+
+        # Set subsystem to Windows (no console) only for Release builds
+        # Keep console for Debug builds to see validation layer output
+        target_link_options(vulkan_app PRIVATE $<$<CONFIG:Release>:/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup>)
+
         # Fix runtime library conflicts in Debug builds
         target_link_options(vulkan_app PRIVATE $<$<CONFIG:Debug>:/NODEFAULTLIB:MSVCRT>)
     endif()
